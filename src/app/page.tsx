@@ -106,7 +106,7 @@ export default function Home() {
 
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-2.5 sm:px-6 md:px-8 shrink-0">
           <h1 className="text-base sm:text-lg font-medium text-foreground tracking-[-0.45px]">
-            Stepbro Downloader
+            stepbro downloader
           </h1>
           <div className="flex items-center gap-1.5">
             <a href="https://github.com/LIL-JRG/stepbro-downloader" target="_blank" rel="noopener noreferrer" aria-label="yt-dlp on GitHub">

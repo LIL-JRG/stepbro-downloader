@@ -1,4 +1,4 @@
-# Stepbro Downloader
+# stepbro downloader
 
 Download videos and audio from thousands of sites. A clean web UI for yt-dlp, built to self-host on your VPS.
 

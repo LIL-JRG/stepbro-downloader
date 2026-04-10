@@ -8,7 +8,7 @@ const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Stepbro Downloader",
+  title: "stepbro downloader",
   description: "Download videos and audio from thousands of sites",
 };
 
