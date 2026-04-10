@@ -1,0 +1,25 @@
+# docker-compose.local.yml — para desarrollo/testing local
+#
+# Uso:
+#   docker compose -f docker-compose.local.yml up --build
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DOWNLOADS_DIR=/downloads
+      - NODE_ENV=production
+    volumes:
+      - downloads:/downloads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  downloads:

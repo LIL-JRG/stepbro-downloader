@@ -1,0 +1,36 @@
+# docker-compose.yml — para Dokploy (producción)
+#
+# Cómo desplegar en Dokploy:
+#   1. Crea una aplicación "Docker Compose" en Dokploy
+#   2. Apunta al repositorio Git
+#   3. En Dokploy → Domains: añade tu dominio (Dokploy configura Traefik solo)
+#   4. En Dokploy → Environment: añade las variables de .env.example si las necesitas
+#   5. Deploy
+#
+# El puerto 3000 es interno al container — Traefik (Dokploy) enruta el tráfico
+# sin conflicto con ningún otro servicio.
+
+services:
+  app:
+    build: .
+    environment:
+      - DOWNLOADS_DIR=/downloads
+      - NODE_ENV=production
+    volumes:
+      - downloads:/downloads
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  downloads:
+
+networks:
+  dokploy-network:
+    external: true
