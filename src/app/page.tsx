@@ -109,7 +109,7 @@ export default function Home() {
             Stepbro Downloader
           </h1>
           <div className="flex items-center gap-1.5">
-            <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener noreferrer" aria-label="yt-dlp on GitHub">
+            <a href="https://github.com/LIL-JRG/stepbro-downloader" target="_blank" rel="noopener noreferrer" aria-label="yt-dlp on GitHub">
               <Button variant="ghost" size="icon" className="size-8">
                 <ExternalLink className="size-4" />
               </Button>
