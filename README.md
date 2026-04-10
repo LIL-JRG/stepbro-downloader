@@ -61,7 +61,7 @@ pip install yt-dlp
 **Install and run**
 
 ```bash
-git clone https://github.com/your-username/stepbro-downloader.git
+git clone https://github.com/LIL-JRG/stepbro-downloader
 cd stepbro-downloader
 npm install
 ```
