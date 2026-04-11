@@ -51,42 +51,41 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   // and only low-quality storyboard images are returned.
   args.push('--remote-components', 'ejs:github')
 
-  if (cookiesFile) {
-    // Authenticated via cookies. Web client visits the YouTube page to get the
-    // full player config and Data Sync ID. player.js is downloaded for
-    // n-challenge + signature solving via node.js + the EJS solver above.
-    args.push('--cookies', cookiesFile)
-
-    const ytArgs = ['player_client=web']
-
-    if (bgutilUrl) {
-      // Fetch PO token from our bgutil instance (correct Docker network URL).
-      // The bgutil yt-dlp plugin is NOT installed — it would try 127.0.0.1:4416
-      // and fail. We pass the token directly here instead.
-      const tokens = await fetchBgutilTokens(bgutilUrl)
-      if (tokens?.poToken) {
-        // Pass the PO token scoped to the web client.
-        // visitor_data is intentionally omitted so yt-dlp uses the one obtained
-        // from visiting the YouTube page (needed for valid Data Sync ID).
-        ytArgs.push(`po_token=web+${tokens.poToken}`)
-      }
-    }
-
-    args.push('--extractor-args', `youtube:${ytArgs.join(';')}`)
-    args.push('--extractor-args', 'youtubetab:skip=webpage')
-  } else if (bgutilUrl) {
-    // No cookies: bypass the YouTube watch page (bot-blocked on VPS IPs) and
-    // supply bgutil's visitor_data + PO token directly via player_skip.
+  if (bgutilUrl) {
+    // bgutil supplies a matched (po_token, visitor_data) pair. Both must be passed
+    // together — YouTube validates coherence between them. If visitor_data is
+    // omitted yt-dlp replaces it with the value from the watch page, breaking
+    // the pair and causing YouTube to return only the legacy 360p format (18).
+    //
+    // player_skip=webpage,configs prevents the page visit from overwriting our
+    // visitor_data. player.js is still downloaded (no 'js' in player_skip) so
+    // n-challenge + sig solving via node + EJS work normally.
+    //
+    // Cookies are still sent on every subsequent request (player API, streams)
+    // even though the watch page is skipped, so authentication is preserved.
     const tokens = await fetchBgutilTokens(bgutilUrl)
     if (tokens?.visitorData) {
+      if (cookiesFile) args.push('--cookies', cookiesFile)
       args.push(
         '--extractor-args',
         `youtube:player_client=web;po_token=web+${tokens.poToken};visitor_data=${tokens.visitorData};player_skip=webpage,configs`,
       )
       args.push('--extractor-args', 'youtubetab:skip=webpage')
     } else {
-      args.push('--extractor-args', 'youtube:player_client=android,ios')
+      // bgutil reachable but returned no tokens yet — fall back.
+      if (cookiesFile) {
+        args.push('--cookies', cookiesFile)
+        args.push('--extractor-args', 'youtube:player_client=web')
+      } else {
+        args.push('--extractor-args', 'youtube:player_client=android,ios')
+      }
+      args.push('--extractor-args', 'youtubetab:skip=webpage')
     }
+  } else if (cookiesFile) {
+    // No bgutil: cookies alone, visit the page normally for player config.
+    args.push('--cookies', cookiesFile)
+    args.push('--extractor-args', 'youtube:player_client=web')
+    args.push('--extractor-args', 'youtubetab:skip=webpage')
   } else {
     // No auth: android/ios use mobile API — no JS challenges, work from any IP.
     args.push('--extractor-args', 'youtube:player_client=android,ios')
