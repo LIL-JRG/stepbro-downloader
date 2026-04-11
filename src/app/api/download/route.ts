@@ -33,7 +33,10 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
     if (quality === 'best') {
       args.push('-f', 'bv*+ba/b')
     } else {
-      args.push('-f', `b[height<=${quality}]/bv*[height<=${quality}]+ba/bv*+ba/b`)
+      // bv*[height<=X]+ba: separate video-only + audio-only streams at the requested height.
+      // Do NOT use b[height<=X] first — it matches YouTube's combined streams which
+      // are capped at 720p regardless of the selected quality.
+      args.push('-f', `bv*[height<=${quality}]+ba/bv*+ba/b`)
     }
 
     const mergeFormat = container !== 'any' ? container : 'mp4'
