@@ -36,9 +36,12 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
       args.push('-f', `b[height<=${quality}]/bv*[height<=${quality}]+ba/bv*+ba/b`)
     }
 
-    const extPref = container !== 'any' ? container : 'mp4'
-    args.push('-S', `ext:${extPref},vcodec:avc,acodec:m4a`)
-    args.push('--merge-output-format', container !== 'any' ? container : 'mp4')
+    const mergeFormat = container !== 'any' ? container : 'mp4'
+    // Sort by quality first (res → fps → bitrate), then prefer compatible codecs
+    // as a tiebreaker. ext: is intentionally omitted — --merge-output-format
+    // handles the output container so we don't penalise VP9/AV1 streams.
+    args.push('-S', 'res,fps,vbr,abr,vcodec:avc,acodec:m4a')
+    args.push('--merge-output-format', mergeFormat)
   }
 
   const ffmpegBin = process.env.FFMPEG_BIN
