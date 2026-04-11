@@ -6,12 +6,6 @@ services:
     networks:
       - dokploy-network
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.stepbro.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.stepbro.entrypoints=websecure"
-      - "traefik.http.routers.stepbro.tls.certresolver=letsencrypt"
-      - "traefik.http.services.stepbro.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
