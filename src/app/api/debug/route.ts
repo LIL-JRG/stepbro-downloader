@@ -24,45 +24,67 @@ export async function GET(request: NextRequest) {
 
   const ytdlpVersion = await runCommand(bin, ['--version'])
 
-  // Test bgutil
   const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
-  let bgutilStatus = 'not configured'
-  let bgutilTokens = null
+
+  // Test bgutil web token (standard) AND android GVS token in parallel
+  let bgutilWebStatus = 'not configured'
+  let bgutilWebTokens: unknown = null
+  let bgutilAndroidStatus = 'not configured'
+  let bgutilAndroidTokens: unknown = null
+
   if (bgutilUrl) {
-    try {
-      const res = await fetch(`${bgutilUrl}/get_pot`, {
+    const [webResult, androidResult] = await Promise.allSettled([
+      fetch(`${bgutilUrl}/get_pot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
         signal: AbortSignal.timeout(30_000),
-      })
-      bgutilStatus = `HTTP ${res.status}`
-      const text = await res.text()
-      try { bgutilTokens = JSON.parse(text) } catch { bgutilTokens = text }
-    } catch (e) {
-      bgutilStatus = `UNREACHABLE: ${(e as Error).message}`
+      }),
+      fetch(`${bgutilUrl}/get_pot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client: 'ANDROID' }),
+        signal: AbortSignal.timeout(10_000),
+      }),
+    ])
+
+    if (webResult.status === 'fulfilled') {
+      bgutilWebStatus = `HTTP ${webResult.value.status}`
+      const text = await webResult.value.text()
+      try { bgutilWebTokens = JSON.parse(text) } catch { bgutilWebTokens = text }
+    } else {
+      bgutilWebStatus = `UNREACHABLE: ${(webResult.reason as Error)?.message}`
+    }
+
+    if (androidResult.status === 'fulfilled') {
+      bgutilAndroidStatus = `HTTP ${androidResult.value.status}`
+      const text = await androidResult.value.text()
+      try { bgutilAndroidTokens = JSON.parse(text) } catch { bgutilAndroidTokens = text }
+    } else {
+      bgutilAndroidStatus = `ERROR: ${(androidResult.reason as Error)?.message}`
     }
   }
 
-  const dataSyncId = sharedArgs.find(a => a.includes('data_sync_id='))
-    ?.match(/data_sync_id=([^;]+)/)?.[1] ?? null
-  const dataSyncIdSource = process.env.YOUTUBE_DATA_SYNC_ID
-    ? 'env var YOUTUBE_DATA_SYNC_ID'
-    : dataSyncId ? 'auto-fetched from youtube.com' : 'not found (account has no YouTube channel)'
-
-  // Format listings: run current config AND android-only in parallel for comparison
+  // Format listings: run current config, android-only, and ios-only in parallel
   let formatsCurrentConfig: string | null = null
   let formatsAndroid: string | null = null
+  let formatsIos: string | null = null
+
   if (testUrl) {
-    const [a, b] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
       runCommand(bin, [
         '--extractor-args', 'youtube:player_client=android',
         '--list-formats', '--no-playlist', testUrl,
       ]),
+      runCommand(bin, [
+        '--extractor-args', 'youtube:player_client=ios',
+        '--list-formats', '--no-playlist', testUrl,
+      ]),
     ])
     formatsCurrentConfig = a
     formatsAndroid = b
+    formatsIos = c
   }
 
   return Response.json({
@@ -70,15 +92,19 @@ export async function GET(request: NextRequest) {
     ytdlpVersion,
     cookiesFile: process.env.YOUTUBE_COOKIES_FILE ?? null,
     bgutilUrl: bgutilUrl ?? null,
-    bgutilStatus,
-    bgutilTokens,
-    dataSyncId,
-    dataSyncIdSource,
+    // bgutil web (standard) token
+    bgutilWebStatus,
+    bgutilWebTokens,
+    // bgutil android GVS token (unlocks android https adaptive streams)
+    bgutilAndroidStatus,
+    bgutilAndroidTokens,
     sharedArgs,
-    // Compare format availability across two different approaches:
-    // formatsCurrentConfig = web + bgutil + cookies (current production config)
-    // formatsAndroid = android client with no auth (mobile API, no cookies needed)
+    // Three-way format comparison:
+    // formatsCurrentConfig = production config (bgutil android GVS / web / ios fallback)
+    // formatsAndroid       = bare android client, no auth (baseline)
+    // formatsIos           = ios client, no auth (HLS streams, no GVS PO token needed)
     formatsCurrentConfig: formatsCurrentConfig ?? 'Pass ?url=<youtube_url> to compare',
     formatsAndroid: formatsAndroid ?? 'Pass ?url=<youtube_url> to compare',
+    formatsIos: formatsIos ?? 'Pass ?url=<youtube_url> to compare',
   })
 }
