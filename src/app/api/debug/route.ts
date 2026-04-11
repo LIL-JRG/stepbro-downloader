@@ -22,9 +22,7 @@ export async function GET(request: NextRequest) {
   const bin = ytdlpBin()
   const sharedArgs = await commonYtdlpArgs()
 
-  const [ytdlpVersion] = await Promise.all([
-    runCommand(bin, ['--version']),
-  ])
+  const ytdlpVersion = await runCommand(bin, ['--version'])
 
   // Test bgutil
   const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
@@ -46,22 +44,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Optional: list formats for a user-supplied URL to diagnose quality issues
-  let formats: string | null = null
-  if (testUrl) {
-    formats = await runCommand(bin, [
-      ...sharedArgs,
-      '--list-formats',
-      '--no-playlist',
-      testUrl,
-    ])
-  }
-
   const dataSyncId = sharedArgs.find(a => a.includes('data_sync_id='))
     ?.match(/data_sync_id=([^;]+)/)?.[1] ?? null
   const dataSyncIdSource = process.env.YOUTUBE_DATA_SYNC_ID
     ? 'env var YOUTUBE_DATA_SYNC_ID'
-    : dataSyncId ? 'auto-fetched from youtube.com' : 'not found — set YOUTUBE_DATA_SYNC_ID env var'
+    : dataSyncId ? 'auto-fetched from youtube.com' : 'not found (account has no YouTube channel)'
+
+  // Format listings: run current config AND android-only in parallel for comparison
+  let formatsCurrentConfig: string | null = null
+  let formatsAndroid: string | null = null
+  if (testUrl) {
+    const [a, b] = await Promise.all([
+      runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
+      runCommand(bin, [
+        '--extractor-args', 'youtube:player_client=android',
+        '--list-formats', '--no-playlist', testUrl,
+      ]),
+    ])
+    formatsCurrentConfig = a
+    formatsAndroid = b
+  }
 
   return Response.json({
     ytdlpBin: bin,
@@ -73,6 +75,10 @@ export async function GET(request: NextRequest) {
     dataSyncId,
     dataSyncIdSource,
     sharedArgs,
-    formats: formats ?? 'Pass ?url=<youtube_url> to see available formats',
+    // Compare format availability across two different approaches:
+    // formatsCurrentConfig = web + bgutil + cookies (current production config)
+    // formatsAndroid = android client with no auth (mobile API, no cookies needed)
+    formatsCurrentConfig: formatsCurrentConfig ?? 'Pass ?url=<youtube_url> to compare',
+    formatsAndroid: formatsAndroid ?? 'Pass ?url=<youtube_url> to compare',
   })
 }
