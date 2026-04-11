@@ -43,6 +43,11 @@ function buildArgs(opts: DownloadOptions, outDir: string): string[] {
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
+  // Use Node.js as JS runtime (available in the container) instead of deno
+  args.push('--js-runtimes', 'nodejs')
+  // Use the iOS player client to bypass YouTube bot detection on server IPs
+  args.push('--extractor-args', 'youtube:player_client=ios,web')
+
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
   return args
 }
