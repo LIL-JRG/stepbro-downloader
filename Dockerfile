@@ -15,15 +15,14 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-# System deps: ffmpeg for merging, python3 + pip for yt-dlp and plugins
-RUN apk add --no-cache ffmpeg python3 py3-pip ca-certificates
+# System deps: ffmpeg for merging, python3 for yt-dlp + plugins
+RUN apk add --no-cache ffmpeg python3 ca-certificates
 
-# Install yt-dlp via pip so plugins (bgutil) are discovered automatically,
-# and install the bgutil PO token provider to bypass YouTube bot detection
-RUN pip3 install --break-system-packages yt-dlp bgutil-ytdlp-pot-provider
-
-# Symlink node as nodejs so yt-dlp can find it with --js-runtimes nodejs
-RUN ln -sf /usr/local/bin/node /usr/local/bin/nodejs
+# Install yt-dlp and the bgutil PO token provider in a virtualenv.
+# Using a venv guarantees both packages share the same Python environment
+# so yt-dlp's plugin discovery finds bgutil automatically.
+RUN python3 -m venv /opt/ytdlp && \
+    /opt/ytdlp/bin/pip install yt-dlp bgutil-ytdlp-pot-provider
 
 # Non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
@@ -31,7 +30,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    YT_DLP_BIN=/opt/ytdlp/bin/yt-dlp
 
 # Copy standalone Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
