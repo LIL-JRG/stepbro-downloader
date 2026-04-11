@@ -96,11 +96,12 @@ docker compose -f docker-compose.local.yml up
 
 ### Deploy to Dokploy
 
-1. Create a **Docker Compose** application in Dokploy and point it to this repository
-2. In **Domains**, add your domain — Dokploy configures Traefik automatically
-3. Deploy
+1. Create a new **Application** in Dokploy and point it to this repository
+2. Set **Build type** to **Dockerfile**
+3. In **Domains**, add your domain and enable HTTPS — Dokploy configures Traefik automatically
+4. Deploy
 
-The container listens on port 3000 internally. Traefik routes HTTPS traffic with no port conflicts. No volumes needed — the app uses the system temp directory.
+No environment variables required for deployment. The container listens on port 3000 internally. No volumes needed — the app uses the system temp directory and deletes files automatically.
 
 ## Built With
 
