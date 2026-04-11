@@ -29,9 +29,10 @@ async function fetchBgutilTokens(baseUrl: string): Promise<BgutilTokens | null> 
     if (!res.ok) return null
     const data = await res.json() as Record<string, string>
     const poToken = data.poToken ?? data.po_token
-    const visitorData = data.visitorData ?? data.visitor_data ?? ''
+    // bgutil v1.3.1 returns "contentBinding" as the visitor data
+    const visitorData = data.contentBinding ?? data.visitorData ?? data.visitor_data ?? ''
     if (!poToken) return null
-    _cachedTokens = { poToken, visitorData }
+    _cachedTokens = { poToken, visitorData: decodeURIComponent(visitorData) }
     _cachedAt = now
     return _cachedTokens
   } catch {
@@ -45,8 +46,8 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   // Use the node binary already present in the container as JS runtime
   args.push('--js-runtimes', 'node:/usr/local/bin/node')
 
-  // Use web+ios clients
-  args.push('--extractor-args', 'youtube:player_client=web,ios')
+  // Use web client — bgutil generates PO tokens specifically for web
+  args.push('--extractor-args', 'youtube:player_client=web')
 
   // Call bgutil HTTP API directly from Node.js to get PO tokens.
   // This bypasses the yt-dlp plugin system entirely — more reliable.
