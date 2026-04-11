@@ -6,15 +6,16 @@ export function commonYtdlpArgs(): string[] {
   const args: string[] = []
 
   // Use the node binary already present in the container as JS runtime.
-  args.push('--js-runtimes', 'nodejs:/usr/local/bin/node')
+  // The correct runtime name is "node" (not "nodejs").
+  args.push('--js-runtimes', 'node:/usr/local/bin/node')
 
-  // tv_embedded + ios are first-party YouTube clients that bypass bot
-  // detection on datacenter IPs without requiring cookies.
-  args.push('--extractor-args', 'youtube:player_client=tv_embedded,ios')
+  // Use web+ios clients. bgutil provides PO tokens for the web client.
+  // tv_embedded was removed in recent yt-dlp versions.
+  args.push('--extractor-args', 'youtube:player_client=web,ios')
 
   // bgutil PO token provider — bypasses YouTube bot detection on server IPs
   // without any account. Set BGUTIL_URL to the bgutil service address.
-  const bgutilUrl = process.env.BGUTIL_URL
+  const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '') // strip trailing slash
   if (bgutilUrl) {
     args.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${bgutilUrl}`)
   }
