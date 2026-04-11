@@ -15,14 +15,12 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-# System deps: ffmpeg for merging, python3 + curl for yt-dlp
-RUN apk add --no-cache ffmpeg python3 curl ca-certificates
+# System deps: ffmpeg for merging, python3 + pip for yt-dlp and plugins
+RUN apk add --no-cache ffmpeg python3 py3-pip ca-certificates
 
-# Install latest yt-dlp binary
-RUN curl -fsSL \
-    https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
-    -o /usr/local/bin/yt-dlp && \
-    chmod +x /usr/local/bin/yt-dlp
+# Install yt-dlp via pip so plugins (bgutil) are discovered automatically,
+# and install the bgutil PO token provider to bypass YouTube bot detection
+RUN pip3 install --break-system-packages yt-dlp bgutil-ytdlp-pot-provider
 
 # Symlink node as nodejs so yt-dlp can find it with --js-runtimes nodejs
 RUN ln -sf /usr/local/bin/node /usr/local/bin/nodejs

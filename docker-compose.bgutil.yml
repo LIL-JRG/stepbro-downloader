@@ -1,0 +1,26 @@
+# docker-compose.bgutil.yml — servicio bgutil para Dokploy
+#
+# Despliega esto como un Docker Compose service SEPARADO en Dokploy:
+#   1. Crea un nuevo "Docker Compose" service en Dokploy
+#   2. Apunta al mismo repositorio
+#   3. En "Compose path" pon: ./docker-compose.bgutil.yml
+#   4. Deploy
+#
+# Luego en el Application service principal (la app de Next.js),
+# agrega esta variable de entorno y haz Redeploy:
+#   BGUTIL_URL=http://bgutil-provider:4416
+
+services:
+  bgutil-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    container_name: bgutil-provider
+    init: true
+    environment:
+      - TOKEN_TTL=6
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
