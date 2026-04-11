@@ -43,10 +43,13 @@ function buildArgs(opts: DownloadOptions, outDir: string): string[] {
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
-  // Use Node.js as JS runtime (available in the container) instead of deno
-  args.push('--js-runtimes', 'nodejs')
-  // Use the iOS player client to bypass YouTube bot detection on server IPs
-  args.push('--extractor-args', 'youtube:player_client=ios,web')
+  // Pass full path to node binary so yt-dlp can use it as JS runtime
+  args.push('--js-runtimes', 'nodejs:/usr/local/bin/node')
+  // Use TV embedded + iOS clients — less bot-detected on server IPs
+  args.push('--extractor-args', 'youtube:player_client=tv_embedded,ios')
+  // If a cookies file is provided, pass it for YouTube authentication
+  const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
+  if (cookiesFile) args.push('--cookies', cookiesFile)
 
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
   return args

@@ -24,6 +24,9 @@ RUN curl -fsSL \
     -o /usr/local/bin/yt-dlp && \
     chmod +x /usr/local/bin/yt-dlp
 
+# Symlink node as nodejs so yt-dlp can find it with --js-runtimes nodejs
+RUN ln -sf /usr/local/bin/node /usr/local/bin/nodejs
+
 # Non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
