@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'URL is required' }, { status: 400 })
   }
 
-  const args = [...await commonYtdlpArgs(), '--dump-json', '--no-playlist', url]
+  const args = [...commonYtdlpArgs(), '--dump-json', '--no-playlist', url]
 
   return new Promise<Response>((resolve) => {
     const chunks: string[] = []
