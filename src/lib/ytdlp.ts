@@ -43,33 +43,28 @@ async function fetchBgutilTokens(baseUrl: string): Promise<BgutilTokens | null> 
 export async function commonYtdlpArgs(): Promise<string[]> {
   const args: string[] = []
 
-  // Use the node binary already present in the container as JS runtime
-  args.push('--js-runtimes', 'node:/usr/local/bin/node')
-  // Allow yt-dlp to download the remote JS challenge solver (needed for n/sig challenges)
-  args.push('--remote-components', 'ejs:github')
-
   const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
   const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
 
   if (cookiesFile) {
-    // Logged-in session via cookies: let yt-dlp visit YouTube normally so it
-    // can pick up the Data Sync ID and other session context from the page.
-    // No player_skip here — that flag prevents the page visit we now want.
+    // Android/iOS clients don't use JS challenge solving (n-challenge / signature),
+    // so their stream URLs work directly from datacenter IPs. The web client does
+    // require JS challenges, which fail unreliably on VPS IPs and silently fall back
+    // to low-quality streams. Cookies still authenticate the session on both clients.
     args.push('--cookies', cookiesFile)
-    args.push('--extractor-args', 'youtube:player_client=web')
-    args.push('--extractor-args', 'youtubetab:skip=webpage')
+    args.push('--extractor-args', 'youtube:player_client=android,ios')
   } else if (bgutilUrl) {
+    // No cookies: use web client with bgutil PO tokens + JS runtime for challenge solving.
+    args.push('--js-runtimes', 'node:/usr/local/bin/node')
+    args.push('--remote-components', 'ejs:github')
     const tokens = await fetchBgutilTokens(bgutilUrl)
     if (tokens && tokens.visitorData) {
-      // No cookies: bypass YouTube's page (bot-blocked on datacenter IPs) and
-      // supply bgutil's visitor_data + po_token directly.
       args.push(
         '--extractor-args',
         `youtube:player_client=web;po_token=web+${tokens.poToken};visitor_data=${tokens.visitorData};player_skip=webpage,configs`,
       )
       args.push('--extractor-args', 'youtubetab:skip=webpage')
     } else {
-      // bgutil didn't return tokens — fall back to ios client (no PO token needed)
       args.push('--extractor-args', 'youtube:player_client=ios')
     }
   } else {
