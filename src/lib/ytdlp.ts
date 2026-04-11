@@ -47,24 +47,34 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   args.push('--js-runtimes', 'node:/usr/local/bin/node')
   args.push('--remote-components', 'ejs:github')
 
-  if (bgutilUrl) {
-    // Combine cookies (account authentication) with bgutil PO tokens (anti-bot proof).
+  if (cookiesFile) {
+    // Cookies strategy: let yt-dlp work normally with a logged-in session.
     //
-    // Why both?
-    //   From a datacenter IP, YouTube's player API returns "Sign in to confirm you're
-    //   not a bot" even with a valid PO token + visitor_data pair when the request
-    //   is unauthenticated. Adding real account cookies to the API call signals that
-    //   this is a genuine user session, bypassing the IP-based bot check.
+    // With valid account cookies the YouTube watch page loads without any bot
+    // check (signed-in users are never shown "Sign in to confirm"). This means:
+    //   1. yt-dlp fetches the watch page and extracts data_sync_id + visitor_data
+    //      from the page config — this is what links the request to the account.
+    //   2. player.js is fetched and the n-challenge is solved via --remote-components.
+    //   3. The player API receives a fully authenticated request and returns the
+    //      complete adaptive format list.
     //
-    // Why player_skip=webpage,configs?
-    //   The YouTube watch page HTML (youtube.com/watch?v=...) is the front-line
-    //   where bot checks happen for unauthenticated requests. Skipping it avoids
-    //   that check entirely. player.js is still fetched so n-challenge solving works
-    //   via --remote-components. Skipping configs prevents yt-dlp from overwriting
-    //   bgutil's visitor_data with the page's own value (they must stay a matched pair).
-    if (cookiesFile) {
-      args.push('--cookies', cookiesFile)
-    }
+    // Why NOT player_skip=webpage,configs here:
+    //   player_skip skips the watch page, so yt-dlp never gets data_sync_id.
+    //   Without data_sync_id YouTube ignores the account context and serves only
+    //   format 18 — the same degraded response as unauthenticated requests.
+    //
+    // Why NOT bgutil tokens alongside cookies:
+    //   bgutil provides its own visitor_data which must form a matched pair with
+    //   its po_token. If bgutil visitor_data is passed while the page's own
+    //   visitor_data is also fetched, yt-dlp warns about the missing data_sync_id
+    //   and the result is again format 18 only.
+    args.push('--cookies', cookiesFile)
+    args.push('--extractor-args', 'youtube:player_client=web')
+    args.push('--extractor-args', 'youtubetab:skip=webpage')
+  } else if (bgutilUrl) {
+    // No cookies: unauthenticated requests from this VPS IP are blocked at the
+    // watch page. Use bgutil PO tokens with player_skip=webpage,configs to skip
+    // the page (avoiding the IP block) while still providing anti-bot proof.
     const tokens = await fetchBgutilWebTokens(bgutilUrl)
     if (tokens?.visitorData) {
       args.push(
@@ -72,21 +82,10 @@ export async function commonYtdlpArgs(): Promise<string[]> {
         `youtube:player_client=web;po_token=web+${tokens.poToken};visitor_data=${tokens.visitorData};player_skip=webpage,configs`,
       )
     } else {
-      // bgutil unreachable — use ios HLS (does not require GVS PO token)
       args.push('--extractor-args', 'youtube:player_client=ios,android')
     }
     args.push('--extractor-args', 'youtubetab:skip=webpage')
-  } else if (cookiesFile) {
-    // Cookies only, no bgutil.
-    //
-    // Use web client with player_skip=webpage: the watch page HTML is skipped to
-    // avoid the IP bot check, but the player API call carries the authentication
-    // cookies so YouTube serves the full format list.
-    args.push('--cookies', cookiesFile)
-    args.push('--extractor-args', 'youtube:player_client=web;player_skip=webpage,configs')
-    args.push('--extractor-args', 'youtubetab:skip=webpage')
   } else {
-    // No auth available. ios uses HLS streams (no GVS PO token required).
     args.push('--extractor-args', 'youtube:player_client=ios,android')
   }
 
