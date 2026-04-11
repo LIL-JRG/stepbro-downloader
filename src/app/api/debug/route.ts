@@ -57,9 +57,11 @@ export async function GET(request: NextRequest) {
     ])
   }
 
-  // Show whether data_sync_id was resolved (it's embedded in sharedArgs if present)
   const dataSyncId = sharedArgs.find(a => a.includes('data_sync_id='))
     ?.match(/data_sync_id=([^;]+)/)?.[1] ?? null
+  const dataSyncIdSource = process.env.YOUTUBE_DATA_SYNC_ID
+    ? 'env var YOUTUBE_DATA_SYNC_ID'
+    : dataSyncId ? 'auto-fetched from youtube.com' : 'not found — set YOUTUBE_DATA_SYNC_ID env var'
 
   return Response.json({
     ytdlpBin: bin,
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
     bgutilStatus,
     bgutilTokens,
     dataSyncId,
+    dataSyncIdSource,
     sharedArgs,
     formats: formats ?? 'Pass ?url=<youtube_url> to see available formats',
   })
