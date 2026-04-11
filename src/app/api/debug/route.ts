@@ -74,13 +74,13 @@ export async function GET(request: NextRequest) {
             '--list-formats', '--no-playlist', testUrl,
           ])
         : Promise.resolve('no cookies configured'),
+      // android and ios are skipped by yt-dlp when --cookies is set,
+      // so these must always run without cookies.
       runCommand(bin, [
-        ...cookiesArgs,
         '--extractor-args', 'youtube:player_client=android;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
       runCommand(bin, [
-        ...cookiesArgs,
         '--extractor-args', 'youtube:player_client=ios;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
