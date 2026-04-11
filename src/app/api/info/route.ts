@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const chunks: string[] = []
     const errors: string[] = []
 
-    const args = [...commonYtdlpArgs(), '--dump-json', '--no-playlist', url]
+    const args = [...await commonYtdlpArgs(), '--dump-json', '--no-playlist', url]
     const proc = spawn(ytdlpBin(), args)
 
     proc.stdout.on('data', (data: Buffer) => {

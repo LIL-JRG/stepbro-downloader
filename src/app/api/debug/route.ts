@@ -23,27 +23,29 @@ export async function GET() {
     runCommand(bin, ['--list-extractors']),
   ])
 
-  let bgutilReachable = 'not configured'
-  let bgutilResponse = null
+  let bgutilStatus = 'not configured'
+  let bgutilTokens = null
   if (bgutilUrl) {
     try {
-      const res = await fetch(`${bgutilUrl}/`, { signal: AbortSignal.timeout(5000) })
-      bgutilReachable = `HTTP ${res.status}`
-      bgutilResponse = await res.text()
+      const res = await fetch(`${bgutilUrl}/get_pot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(10000),
+      })
+      bgutilStatus = `HTTP ${res.status}`
+      const text = await res.text()
+      try { bgutilTokens = JSON.parse(text) } catch { bgutilTokens = text }
     } catch (e) {
-      bgutilReachable = `UNREACHABLE: ${(e as Error).message}`
+      bgutilStatus = `UNREACHABLE: ${(e as Error).message}`
     }
   }
-
-  const bgutilPluginLoaded = ytdlpPlugins.toLowerCase().includes('bgutil') ||
-    ytdlpPlugins.toLowerCase().includes('youtubepot')
 
   return Response.json({
     ytdlpBin: bin,
     ytdlpVersion,
     bgutilUrl,
-    bgutilReachable,
-    bgutilResponse,
-    bgutilPluginLoaded,
+    bgutilStatus,
+    bgutilTokens,
   })
 }
