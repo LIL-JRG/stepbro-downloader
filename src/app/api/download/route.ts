@@ -5,6 +5,7 @@ import { join } from 'path'
 import { v4 as uuid } from 'uuid'
 import type { NextRequest } from 'next/server'
 import { registerTempFile } from '@/lib/temp-store'
+import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 
 export const runtime = 'nodejs'
 
@@ -43,14 +44,7 @@ function buildArgs(opts: DownloadOptions, outDir: string): string[] {
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
-  // Pass full path to node binary so yt-dlp can use it as JS runtime
-  args.push('--js-runtimes', 'nodejs:/usr/local/bin/node')
-  // Use TV embedded + iOS clients — less bot-detected on server IPs
-  args.push('--extractor-args', 'youtube:player_client=tv_embedded,ios')
-  // If a cookies file is provided, pass it for YouTube authentication
-  const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
-  if (cookiesFile) args.push('--cookies', cookiesFile)
-
+  args.push(...commonYtdlpArgs())
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
   return args
 }
@@ -80,8 +74,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     start(controller) {
       const args = buildArgs(opts, tempDir)
-      const bin = process.env.YT_DLP_BIN || 'yt-dlp'
-      const proc = spawn(bin, args)
+      const proc = spawn(ytdlpBin(), args)
 
       proc.stdout.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n')

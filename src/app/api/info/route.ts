@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import type { NextRequest } from 'next/server'
+import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 
 export const runtime = 'nodejs'
 
@@ -14,8 +15,8 @@ export async function POST(request: NextRequest) {
     const chunks: string[] = []
     const errors: string[] = []
 
-    const bin = process.env.YT_DLP_BIN || 'yt-dlp'
-    const proc = spawn(bin, ['--dump-json', '--no-playlist', url])
+    const args = [...commonYtdlpArgs(), '--dump-json', '--no-playlist', url]
+    const proc = spawn(ytdlpBin(), args)
 
     proc.stdout.on('data', (data: Buffer) => {
       chunks.push(data.toString())
