@@ -46,18 +46,24 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   // Use the node binary already present in the container as JS runtime
   args.push('--js-runtimes', 'node:/usr/local/bin/node')
 
-  // Use web client — bgutil generates PO tokens specifically for web
-  args.push('--extractor-args', 'youtube:player_client=web')
-
-  // Call bgutil HTTP API directly from Node.js to get PO tokens.
-  // This bypasses the yt-dlp plugin system entirely — more reliable.
   const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
   if (bgutilUrl) {
     const tokens = await fetchBgutilTokens(bgutilUrl)
-    if (tokens) {
-      const visitorPart = tokens.visitorData ? `;visitor_data=${tokens.visitorData}` : ''
-      args.push('--extractor-args', `youtube:po_token=web+${tokens.poToken}${visitorPart}`)
+    if (tokens && tokens.visitorData) {
+      // player_skip=webpage,configs tells yt-dlp to NOT visit YouTube's page
+      // (which would overwrite our visitor_data) and use ours directly.
+      // This matches the documented approach for supplying external visitor_data + po_token.
+      args.push(
+        '--extractor-args',
+        `youtube:player_client=web;po_token=web+${tokens.poToken};visitor_data=${tokens.visitorData};player_skip=webpage,configs`,
+      )
+      args.push('--extractor-args', 'youtubetab:skip=webpage')
+    } else {
+      // bgutil didn't return tokens — fall back to ios client (no PO token needed)
+      args.push('--extractor-args', 'youtube:player_client=ios')
     }
+  } else {
+    args.push('--extractor-args', 'youtube:player_client=ios')
   }
 
   // Optional: cookies file for age-restricted or private content
