@@ -57,6 +57,10 @@ export async function GET(request: NextRequest) {
     ])
   }
 
+  // Show whether data_sync_id was resolved (it's embedded in sharedArgs if present)
+  const dataSyncId = sharedArgs.find(a => a.includes('data_sync_id='))
+    ?.match(/data_sync_id=([^;]+)/)?.[1] ?? null
+
   return Response.json({
     ytdlpBin: bin,
     ytdlpVersion,
@@ -64,9 +68,8 @@ export async function GET(request: NextRequest) {
     bgutilUrl: bgutilUrl ?? null,
     bgutilStatus,
     bgutilTokens,
-    // Show the exact args being passed to every yt-dlp call
+    dataSyncId,
     sharedArgs,
-    // Format list (only when ?url= is provided)
     formats: formats ?? 'Pass ?url=<youtube_url> to see available formats',
   })
 }
