@@ -31,7 +31,7 @@ export async function GET() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(120_000),
       })
       bgutilStatus = `HTTP ${res.status}`
       const text = await res.text()

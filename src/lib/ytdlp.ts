@@ -8,21 +8,32 @@ interface BgutilTokens {
   visitorData: string
 }
 
+// Cache tokens for 6 hours (matches bgutil's TOKEN_TTL default)
+let _cachedTokens: BgutilTokens | null = null
+let _cachedAt = 0
+const TOKEN_CACHE_MS = 6 * 60 * 60 * 1000
+
 async function fetchBgutilTokens(baseUrl: string): Promise<BgutilTokens | null> {
+  const now = Date.now()
+  if (_cachedTokens && now - _cachedAt < TOKEN_CACHE_MS) return _cachedTokens
+
   try {
+    // bgutil needs to call YouTube internally on the first request to get an
+    // IntegrityToken — this can take up to 2 minutes on cold start.
     const res = await fetch(`${baseUrl}/get_pot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(120_000),
     })
     if (!res.ok) return null
     const data = await res.json() as Record<string, string>
-    // Handle both camelCase and snake_case response keys
     const poToken = data.poToken ?? data.po_token
     const visitorData = data.visitorData ?? data.visitor_data ?? ''
     if (!poToken) return null
-    return { poToken, visitorData }
+    _cachedTokens = { poToken, visitorData }
+    _cachedAt = now
+    return _cachedTokens
   } catch {
     return null
   }
