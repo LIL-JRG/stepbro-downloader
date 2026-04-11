@@ -22,7 +22,7 @@ RUN apk add --no-cache ffmpeg python3 ca-certificates
 # Using a venv guarantees both packages share the same Python environment
 # so yt-dlp's plugin discovery finds bgutil automatically.
 RUN python3 -m venv /opt/ytdlp && \
-    /opt/ytdlp/bin/pip install yt-dlp bgutil-ytdlp-pot-provider
+    /opt/ytdlp/bin/pip install yt-dlp
 
 # Non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
