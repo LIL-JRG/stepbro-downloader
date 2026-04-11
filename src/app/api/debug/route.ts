@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
-import { ytdlpBin } from '@/lib/ytdlp'
+import type { NextRequest } from 'next/server'
+import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 
 export const runtime = 'nodejs'
 
@@ -14,15 +15,19 @@ function runCommand(bin: string, args: string[]): Promise<string> {
   })
 }
 
-export async function GET() {
-  const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
-  const bin = ytdlpBin()
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const testUrl = searchParams.get('url') ?? ''
 
-  const [ytdlpVersion, ytdlpPlugins] = await Promise.all([
+  const bin = ytdlpBin()
+  const sharedArgs = await commonYtdlpArgs()
+
+  const [ytdlpVersion] = await Promise.all([
     runCommand(bin, ['--version']),
-    runCommand(bin, ['--list-extractors']),
   ])
 
+  // Test bgutil
+  const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
   let bgutilStatus = 'not configured'
   let bgutilTokens = null
   if (bgutilUrl) {
@@ -31,7 +36,7 @@ export async function GET() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(30_000),
       })
       bgutilStatus = `HTTP ${res.status}`
       const text = await res.text()
@@ -41,11 +46,27 @@ export async function GET() {
     }
   }
 
+  // Optional: list formats for a user-supplied URL to diagnose quality issues
+  let formats: string | null = null
+  if (testUrl) {
+    formats = await runCommand(bin, [
+      ...sharedArgs,
+      '--list-formats',
+      '--no-playlist',
+      testUrl,
+    ])
+  }
+
   return Response.json({
     ytdlpBin: bin,
     ytdlpVersion,
-    bgutilUrl,
+    cookiesFile: process.env.YOUTUBE_COOKIES_FILE ?? null,
+    bgutilUrl: bgutilUrl ?? null,
     bgutilStatus,
     bgutilTokens,
+    // Show the exact args being passed to every yt-dlp call
+    sharedArgs,
+    // Format list (only when ?url= is provided)
+    formats: formats ?? 'Pass ?url=<youtube_url> to see available formats',
   })
 }

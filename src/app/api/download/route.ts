@@ -18,7 +18,7 @@ interface DownloadOptions {
   audioQuality?: string
 }
 
-function buildArgs(opts: DownloadOptions, outDir: string): string[] {
+async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[]> {
   const args: string[] = []
   args.push('-o', join(outDir, '%(title).100s [%(id)s].%(ext)s'), '--restrict-filenames')
 
@@ -50,7 +50,7 @@ function buildArgs(opts: DownloadOptions, outDir: string): string[] {
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
-  args.push(...commonYtdlpArgs())
+  args.push(...await commonYtdlpArgs())
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
   return args
 }
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
   const progressRegex =
     /\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\S*)\s+at\s+([\d.]+\S*)\s+ETA\s+(\S+)/
 
-  const args = buildArgs(opts, tempDir)
+  const args = await buildArgs(opts, tempDir)
 
   const stream = new ReadableStream({
     start(controller) {
