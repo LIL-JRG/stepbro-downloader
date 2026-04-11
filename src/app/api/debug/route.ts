@@ -24,87 +24,86 @@ export async function GET(request: NextRequest) {
 
   const ytdlpVersion = await runCommand(bin, ['--version'])
 
-  const bgutilUrl = process.env.BGUTIL_URL?.replace(/\/$/, '')
+  const bgutilUrl  = process.env.BGUTIL_URL?.replace(/\/$/, '')
+  const cookiesFile = process.env.YOUTUBE_COOKIES_FILE ?? null
 
-  // Test bgutil web token (standard) AND android GVS token in parallel
+  // Test bgutil token endpoint
   let bgutilWebStatus = 'not configured'
   let bgutilWebTokens: unknown = null
-  let bgutilAndroidStatus = 'not configured'
-  let bgutilAndroidTokens: unknown = null
 
   if (bgutilUrl) {
-    const [webResult, androidResult] = await Promise.allSettled([
-      fetch(`${bgutilUrl}/get_pot`, {
+    try {
+      const res = await fetch(`${bgutilUrl}/get_pot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
         signal: AbortSignal.timeout(30_000),
-      }),
-      fetch(`${bgutilUrl}/get_pot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client: 'ANDROID' }),
-        signal: AbortSignal.timeout(10_000),
-      }),
-    ])
-
-    if (webResult.status === 'fulfilled') {
-      bgutilWebStatus = `HTTP ${webResult.value.status}`
-      const text = await webResult.value.text()
+      })
+      bgutilWebStatus = `HTTP ${res.status}`
+      const text = await res.text()
       try { bgutilWebTokens = JSON.parse(text) } catch { bgutilWebTokens = text }
-    } else {
-      bgutilWebStatus = `UNREACHABLE: ${(webResult.reason as Error)?.message}`
-    }
-
-    if (androidResult.status === 'fulfilled') {
-      bgutilAndroidStatus = `HTTP ${androidResult.value.status}`
-      const text = await androidResult.value.text()
-      try { bgutilAndroidTokens = JSON.parse(text) } catch { bgutilAndroidTokens = text }
-    } else {
-      bgutilAndroidStatus = `ERROR: ${(androidResult.reason as Error)?.message}`
+    } catch (e) {
+      bgutilWebStatus = `UNREACHABLE: ${(e as Error).message}`
     }
   }
 
-  // Format listings: run current config, android-only, and ios-only in parallel
+  // Format listings when a test URL is provided.
+  // Four approaches tested in parallel to pinpoint which combination works:
+  //
+  //  formatsCurrentConfig  — full production config (sharedArgs above)
+  //  formatsWebCookiesOnly — cookies alone, no bgutil, no player_skip
+  //                          (does a logged-in watch page bypass the IP block?)
+  //  formatsAndroidNoPage  — android with player_skip=webpage
+  //                          (avoids watch-page bot check, goes direct to android API)
+  //  formatsIosNoPage      — ios with player_skip=webpage
+  //                          (same, but ios for HLS streams)
   let formatsCurrentConfig: string | null = null
-  let formatsAndroid: string | null = null
-  let formatsIos: string | null = null
+  let formatsWebCookiesOnly: string | null = null
+  let formatsAndroidNoPage: string | null = null
+  let formatsIosNoPage: string | null = null
 
   if (testUrl) {
-    const [a, b, c] = await Promise.all([
+    const cookiesArgs = cookiesFile ? ['--cookies', cookiesFile] : []
+
+    const [a, b, c, d] = await Promise.all([
       runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
+      cookiesFile
+        ? runCommand(bin, [
+            '--cookies', cookiesFile,
+            '--extractor-args', 'youtube:player_client=web',
+            '--list-formats', '--no-playlist', testUrl,
+          ])
+        : Promise.resolve('no cookies configured'),
       runCommand(bin, [
-        '--extractor-args', 'youtube:player_client=android',
+        ...cookiesArgs,
+        '--extractor-args', 'youtube:player_client=android;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
       runCommand(bin, [
-        '--extractor-args', 'youtube:player_client=ios',
+        ...cookiesArgs,
+        '--extractor-args', 'youtube:player_client=ios;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
     ])
-    formatsCurrentConfig = a
-    formatsAndroid = b
-    formatsIos = c
+
+    formatsCurrentConfig  = a
+    formatsWebCookiesOnly = b
+    formatsAndroidNoPage  = c
+    formatsIosNoPage      = d
   }
 
   return Response.json({
     ytdlpBin: bin,
     ytdlpVersion,
-    cookiesFile: process.env.YOUTUBE_COOKIES_FILE ?? null,
+    cookiesFile,
     bgutilUrl: bgutilUrl ?? null,
-    // bgutil web (standard) token
     bgutilWebStatus,
     bgutilWebTokens,
-    // bgutil android GVS token (unlocks android https adaptive streams)
-    bgutilAndroidStatus,
-    bgutilAndroidTokens,
     sharedArgs,
-    // Three-way format comparison:
-    // formatsCurrentConfig = production config (bgutil android GVS / web / ios fallback)
-    // formatsAndroid       = bare android client, no auth (baseline)
-    // formatsIos           = ios client, no auth (HLS streams, no GVS PO token needed)
-    formatsCurrentConfig: formatsCurrentConfig ?? 'Pass ?url=<youtube_url> to compare',
-    formatsAndroid: formatsAndroid ?? 'Pass ?url=<youtube_url> to compare',
-    formatsIos: formatsIos ?? 'Pass ?url=<youtube_url> to compare',
+    // Format listing comparisons (add ?url=<youtube_url> to populate):
+    formatsCurrentConfig:  formatsCurrentConfig  ?? 'Pass ?url=<youtube_url> to compare',
+    formatsWebCookiesOnly: formatsWebCookiesOnly ?? 'Pass ?url=<youtube_url> to compare',
+    formatsAndroidNoPage:  formatsAndroidNoPage  ?? 'Pass ?url=<youtube_url> to compare',
+    formatsIosNoPage:      formatsIosNoPage       ?? 'Pass ?url=<youtube_url> to compare',
   })
 }
