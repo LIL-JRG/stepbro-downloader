@@ -1,12 +1,34 @@
 import { spawn } from 'child_process'
-import { mkdtemp, readdir, rm, stat } from 'fs/promises'
+import { createWriteStream } from 'fs'
+import { mkdtemp, readdir, rm } from 'fs/promises'
+import { createRequire } from 'module'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { v4 as uuid } from 'uuid'
 import type { NextRequest } from 'next/server'
+
+// archiver is CommonJS (`export =`), which fights ESM default/named imports and
+// isn't seen as callable via `typeof import`. Require it directly for reliable
+// interop; the surface we use (pipe/file/on/finalize) is tiny and local to zipFiles.
+type ArchiverInstance = {
+  pipe(dest: NodeJS.WritableStream): void
+  file(path: string, opts: { name: string }): void
+  on(event: 'error', cb: (err: Error) => void): void
+  finalize(): Promise<void>
+}
+const archiver = createRequire(import.meta.url)('archiver') as (
+  format: string,
+  options?: { zlib?: { level?: number } }
+) => ArchiverInstance
 import { registerTempFile } from '@/lib/temp-store'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
-import { getClientIp, peekLimit, consumeLimit, MAX_VIDEO_DURATION } from '@/lib/rate-limit'
+import {
+  getClientIp,
+  peekLimit,
+  consumeLimit,
+  MAX_VIDEO_DURATION,
+  PLAYLIST_MAX_ITEMS,
+} from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -17,11 +39,23 @@ interface DownloadOptions {
   audioOnly?: boolean
   audioFormat?: string
   audioQuality?: string
+  playlist?: boolean
+  embedThumbnail?: boolean
+  embedSubs?: boolean
+  srtSubs?: boolean
 }
 
-async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[]> {
+// Sidecar (subtitle / thumbnail) extensions — not counted as downloads.
+const SIDECAR_RE = /\.(srt|vtt|ass|ssa|jpg|jpeg|png|webp)$/i
+
+function buildArgs(opts: DownloadOptions, outDir: string, maxItems: number, shared: string[]): string[] {
   const args: string[] = []
-  args.push('-o', join(outDir, '%(title).100s [%(id)s].%(ext)s'), '--restrict-filenames')
+
+  // Playlists get an index prefix so items sort and never collide.
+  const template = opts.playlist
+    ? '%(playlist_index)s - %(title).80s [%(id)s].%(ext)s'
+    : '%(title).100s [%(id)s].%(ext)s'
+  args.push('-o', join(outDir, template), '--restrict-filenames')
 
   if (opts.audioOnly) {
     args.push('-x')
@@ -33,27 +67,20 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
     const mergeFormat = container !== 'any' ? container : 'mp4'
 
     // Audio MUST be compatible with the output container, or the merged file plays
-    // with no sound in most players. YouTube's highest-bitrate audio is Opus (webm),
-    // which does NOT play inside an MP4 container (Windows, QuickTime, Safari, many
-    // browsers) — so pin AAC (m4a) for mp4/mkv and Opus for webm. YouTube always
-    // offers an m4a AAC track, so the ext filter reliably matches; the un-filtered
-    // fallbacks keep downloads working if it ever doesn't.
+    // with no sound in most players. Pin AAC (m4a) for mp4/mkv and Opus for webm.
     const audioExt = mergeFormat === 'webm' ? 'webm' : 'm4a'
     const heightFilter = quality === 'best' ? '' : `[height<=${quality}]`
-
-    // Prefer separate video-only + audio streams — combined streams (the `b`
-    // fallback) are capped at 720p regardless of the selected quality.
     const combinedFallback = heightFilter ? `/b${heightFilter}/b` : '/b'
-    args.push(
-      '-f',
-      `bv*${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`,
-    )
-    // Sort by quality first (res → fps → bitrate), then prefer compatible codecs
-    // as a tiebreaker. ext: is intentionally omitted — --merge-output-format
-    // handles the output container so we don't penalise VP9/AV1 streams.
+    args.push('-f', `bv*${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`)
     args.push('-S', 'res,fps,vbr,abr,vcodec:avc,acodec:m4a')
     args.push('--merge-output-format', mergeFormat)
   }
+
+  // Extras.
+  if (opts.embedThumbnail) args.push('--embed-thumbnail')
+  if (opts.embedSubs) args.push('--embed-subs')
+  if (opts.srtSubs) args.push('--write-subs', '--convert-subs', 'srt')
+  if (opts.embedSubs || opts.srtSubs) args.push('--sub-langs', 'all')
 
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
@@ -61,16 +88,31 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
   // Anti-abuse backstop: refuse videos longer than the cap (client gates too).
   if (MAX_VIDEO_DURATION > 0) args.push('--match-filters', `duration<=${MAX_VIDEO_DURATION}`)
 
-  args.push(...await commonYtdlpArgs())
-  args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
+  args.push(...shared)
+
+  if (opts.playlist) {
+    args.push('--yes-playlist', '--playlist-items', `1-${maxItems}`)
+  } else {
+    args.push('--no-playlist')
+  }
+  args.push('--newline', '--force-overwrites', opts.url)
   return args
 }
 
-function sendEvent(
-  controller: ReadableStreamDefaultController,
-  encoder: TextEncoder,
-  data: object
-) {
+function zipFiles(paths: string[], outPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const output = createWriteStream(outPath)
+    const archive = archiver('zip', { zlib: { level: 5 } })
+    output.on('close', () => resolve())
+    output.on('error', reject)
+    archive.on('error', reject)
+    archive.pipe(output)
+    for (const p of paths) archive.file(p, { name: basename(p) })
+    archive.finalize()
+  })
+}
+
+function sendEvent(controller: ReadableStreamDefaultController, encoder: TextEncoder, data: object) {
   controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
 }
 
@@ -81,19 +123,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'URL is required' }, { status: 400 })
   }
 
-  // Enforce the per-IP daily limit up front (a slot is only consumed on success).
+  // Enforce the per-IP daily limit up front (slots are only consumed on success).
   const clientIp = getClientIp(request)
   const status = peekLimit(clientIp)
   if (status.remaining <= 0) {
     return Response.json(
-      {
-        error: 'Daily download limit reached. Please try again tomorrow.',
-        limit: status.limit,
-        remaining: 0,
-      },
+      { error: 'Daily download limit reached. Please try again tomorrow.', limit: status.limit, remaining: 0 },
       { status: 429 }
     )
   }
+
+  // Never let a playlist pull more than the remaining daily allowance.
+  const maxItems = opts.playlist ? Math.min(PLAYLIST_MAX_ITEMS, status.remaining) : 1
 
   const token = uuid()
   const tempDir = await mkdtemp(join(tmpdir(), `ytdlp-${token}-`))
@@ -102,7 +143,8 @@ export async function POST(request: NextRequest) {
   const progressRegex =
     /\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\S*)\s+at\s+([\d.]+\S*)\s+ETA\s+(\S+)/
 
-  const args = await buildArgs(opts, tempDir)
+  const shared = await commonYtdlpArgs()
+  const args = buildArgs(opts, tempDir, maxItems, shared)
 
   let proc: ReturnType<typeof spawn> | null = null
   let registered = false
@@ -142,16 +184,9 @@ export async function POST(request: NextRequest) {
       p.on('close', async (code) => {
         if (code === 0) {
           try {
-            // Find the downloaded file (largest non-temp file in the dir)
             const entries = await readdir(tempDir)
-            const files = await Promise.all(
-              entries
-                .filter(f => !f.endsWith('.part') && !f.endsWith('.ytdl'))
-                .map(async (f) => ({ f, size: (await stat(join(tempDir, f))).size }))
-            )
-            const largest = files.sort((a, b) => b.size - a.size)[0]
-
-            if (!largest) {
+            const kept = entries.filter((f) => !f.endsWith('.part') && !f.endsWith('.ytdl'))
+            if (kept.length === 0) {
               throw new Error(
                 MAX_VIDEO_DURATION > 0
                   ? `No file produced — the video may exceed the maximum allowed length (${Math.floor(MAX_VIDEO_DURATION / 3600)}h).`
@@ -159,15 +194,30 @@ export async function POST(request: NextRequest) {
               )
             }
 
-            const filePath = join(tempDir, largest.f)
-            registerTempFile(token, filePath, largest.f)
+            // Media outputs (exclude subtitle/thumbnail sidecars) drive the count.
+            const media = kept.filter((f) => !SIDECAR_RE.test(f))
+            const mediaCount = Math.max(1, media.length)
+
+            let outName: string
+            let outPath: string
+            if (kept.length === 1) {
+              outName = kept[0]!
+              outPath = join(tempDir, outName)
+            } else {
+              // Multiple files (playlist items and/or .srt sidecars) → one ZIP.
+              const base = opts.playlist ? 'playlist' : (media[0]?.replace(/\.[^.]+$/, '') || 'download')
+              outName = `${base}.zip`
+              outPath = join(tempDir, outName)
+              await zipFiles(kept.map((f) => join(tempDir, f)), outPath)
+            }
+
+            registerTempFile(token, outPath, outName)
             registered = true
-            // Count this successful download against the daily limit.
-            const usage = consumeLimit(clientIp)
+            const usage = consumeLimit(clientIp, mediaCount)
             sendEvent(controller, encoder, {
               type: 'ready',
               token,
-              filename: largest.f,
+              filename: outName,
               remaining: usage.remaining,
               limit: usage.limit,
             })
@@ -178,10 +228,7 @@ export async function POST(request: NextRequest) {
             })
           }
         } else {
-          sendEvent(controller, encoder, {
-            type: 'failed',
-            message: `Process exited with code ${code}`,
-          })
+          sendEvent(controller, encoder, { type: 'failed', message: `Process exited with code ${code}` })
         }
         controller.close()
       })

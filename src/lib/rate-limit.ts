@@ -21,6 +21,9 @@ export const DAILY_LIMIT = Math.max(1, Number(process.env.DAILY_DOWNLOAD_LIMIT ?
 /** Max allowed video duration in seconds (0 = unlimited). Anti-abuse guard. */
 export const MAX_VIDEO_DURATION = Math.max(0, Number(process.env.MAX_VIDEO_DURATION ?? 10800))
 
+/** Max playlist items downloaded in one request (also capped by daily allowance). */
+export const PLAYLIST_MAX_ITEMS = Math.max(1, Number(process.env.PLAYLIST_MAX_ITEMS ?? 10))
+
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
 const STORE_FILE = join(DATA_DIR, 'rate-limit.json')
 

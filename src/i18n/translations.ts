@@ -23,6 +23,12 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       tooLong: 'Video demasiado largo (máx {hours}h)',
     },
     progress: { processing: 'Procesando…' },
+    options: {
+      playlist: 'Lista',
+      thumbnail: 'Miniatura',
+      subsEmbed: 'Incrustar subtítulos',
+      subsSrt: 'Subtítulos (.srt)',
+    },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {
       text: 'Confirmo que he leído y acepto los términos de derechos de autor y no descargaré contenido con derechos de autor.',

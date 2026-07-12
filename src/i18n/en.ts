@@ -27,6 +27,12 @@ export const en = {
   progress: {
     processing: 'Processing…',
   },
+  options: {
+    playlist: 'Playlist',
+    thumbnail: 'Thumbnail',
+    subsEmbed: 'Embed subtitles',
+    subsSrt: 'Subtitles (.srt)',
+  },
   preview: {
     loading: 'Loading preview…',
   },

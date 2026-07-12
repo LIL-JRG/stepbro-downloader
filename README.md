@@ -187,6 +187,7 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`); needed to bypass a blocked VPS IP |
 | `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day |
 | `MAX_VIDEO_DURATION` | `10800` | Max allowed video length in seconds (0 = unlimited) |
+| `PLAYLIST_MAX_ITEMS` | `10` | Max items pulled per playlist request (also capped by the daily allowance) |
 | `DATA_DIR` | `/data` (Docker) | Where per-IP rate-limit state is persisted; mount a volume here to keep it across redeploys |
 | `INFO_RATE_PER_MIN` | `30` | Max `/api/info` (preview) requests per IP per minute |
 | `YTDLP_AUTO_UPDATE` | `true` | Update yt-dlp + bgutil plugin on container start |
