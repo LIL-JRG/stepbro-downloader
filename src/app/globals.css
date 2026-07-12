@@ -60,8 +60,9 @@
 }
 
 .dark {
-  /* Deep navy canvas so the card still reads as a raised surface in dark mode. */
-  --page: oklch(0.205 0.035 265);
+  /* Neutral near-black canvas (ytmp3 dark mode is charcoal, not blue). The card
+     sits one step lighter so it still reads as a raised surface. */
+  --page: oklch(0.15 0 0);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
