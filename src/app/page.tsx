@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -15,7 +16,7 @@ import { useI18n } from '@/i18n/provider'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide-react'
 
 // Where the Donate button points — change to your own sponsor/donation page.
-const DONATE_URL = 'https://github.com/sponsors/LIL-JRG'
+const DONATE_URL = 'https://ko-fi.com/jorgerasgado'
 const CONSENT_KEY = 'stepbro-consent'
 
 function looksLikeUrl(s: string): boolean {
@@ -30,6 +31,9 @@ export default function Home() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [agreed, setAgreed] = useState(true)
   const [usage, setUsage] = useState<{ limit: number; remaining: number } | null>(null)
+  const [maxDuration, setMaxDuration] = useState(0)
+  const [progress, setProgress] = useState<{ percent: number; speed?: string; eta?: string } | null>(null)
+  const downloadAbort = useRef<AbortController | null>(null)
 
   // Fetch the current daily download allowance (server is the source of truth).
   useEffect(() => {
@@ -39,6 +43,7 @@ export default function Home() {
       .then((d) => {
         if (active && typeof d?.limit === 'number') {
           setUsage({ limit: d.limit, remaining: d.remaining })
+          setMaxDuration(typeof d.maxDuration === 'number' ? d.maxDuration : 0)
         }
       })
       .catch(() => {})
@@ -97,6 +102,14 @@ export default function Home() {
 
   // Download uses the canonical webpage_url when we have a preview, else the raw input.
   const targetUrl = videoData?.webpage_url ?? url.trim()
+  const tooLong = maxDuration > 0 && !!videoData?.duration && videoData.duration > maxDuration
+
+  function cancelDownload() {
+    downloadAbort.current?.abort()
+    downloadAbort.current = null
+    setIsDownloading(false)
+    setProgress(null)
+  }
 
   async function pasteFromClipboard() {
     try {
@@ -122,11 +135,15 @@ export default function Home() {
       return
     }
     setIsDownloading(true)
+    setProgress({ percent: 0 })
+    const controller = new AbortController()
+    downloadAbort.current = controller
 
     fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
+      signal: controller.signal,
     }).then(async (res) => {
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({})) as { error?: string; limit?: number; remaining?: number }
@@ -155,8 +172,13 @@ export default function Home() {
               message?: string
               remaining?: number
               limit?: number
+              percent?: number
+              speed?: string
+              eta?: string
             }
-            if (event.type === 'ready' && event.token) {
+            if (event.type === 'progress' && typeof event.percent === 'number') {
+              setProgress({ percent: event.percent, speed: event.speed, eta: event.eta })
+            } else if (event.type === 'ready' && event.token) {
               const a = document.createElement('a')
               a.href = `/api/download/${event.token}`
               a.download = event.filename ?? 'download'
@@ -167,16 +189,27 @@ export default function Home() {
                 setUsage({ limit: event.limit, remaining: event.remaining })
               }
               toast.success(m.toast.started)
+              setProgress(null)
+              downloadAbort.current = null
               setIsDownloading(false)
             } else if (event.type === 'failed') {
               toast.error(event.message ?? m.toast.failed)
+              setProgress(null)
+              downloadAbort.current = null
               setIsDownloading(false)
             }
           } catch { /* ignore parse errors */ }
         }
       }
     }).catch((err) => {
+      // User-initiated cancel — reset quietly.
+      if ((err as Error).name === 'AbortError') {
+        setProgress(null)
+        setIsDownloading(false)
+        return
+      }
       toast.error(err instanceof Error ? err.message : String(err))
+      setProgress(null)
       setIsDownloading(false)
     })
   }
@@ -238,10 +271,34 @@ export default function Home() {
                 targetUrl={targetUrl}
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
-                blocked={!agreed || (usage !== null && usage.remaining <= 0)}
+                blocked={!agreed || tooLong || (usage !== null && usage.remaining <= 0)}
               />
 
-              {usage && (
+              {isDownloading ? (
+                <div className="mt-3 space-y-2">
+                  <Progress value={progress?.percent ?? 0} />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="tabular-nums">
+                      {progress && progress.percent < 100
+                        ? `${Math.round(progress.percent)}%` +
+                          (progress.speed ? ` · ${progress.speed}` : '') +
+                          (progress.eta ? ` · ETA ${progress.eta}` : '')
+                        : m.progress.processing}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={cancelDownload}
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      {m.form.cancel}
+                    </button>
+                  </div>
+                </div>
+              ) : tooLong ? (
+                <p className="mt-2.5 text-center text-xs font-medium text-destructive">
+                  {m.usage.tooLong.replace('{hours}', String(Math.floor(maxDuration / 3600)))}
+                </p>
+              ) : usage ? (
                 <p
                   className={cn(
                     'mt-2.5 text-center text-xs',
@@ -254,7 +311,7 @@ export default function Home() {
                         .replace('{limit}', String(usage.limit))
                     : m.usage.reached}
                 </p>
-              )}
+              ) : null}
             </div>
 
             {/* Disclaimer */}

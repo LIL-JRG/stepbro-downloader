@@ -17,10 +17,15 @@ export const en = {
     best: 'Best',
     download: 'Download',
     downloading: 'Downloading…',
+    cancel: 'Cancel',
   },
   usage: {
     left: '{remaining} of {limit} downloads left today',
     reached: 'Daily limit reached — resets tomorrow',
+    tooLong: 'Video too long (max {hours}h)',
+  },
+  progress: {
+    processing: 'Processing…',
   },
   preview: {
     loading: 'Loading preview…',

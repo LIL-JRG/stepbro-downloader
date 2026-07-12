@@ -185,7 +185,11 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `FFMPEG_BIN` | *(system PATH)* | Path to the ffmpeg binary |
 | `BGUTIL_URL` | *(disabled)* | URL of the bgutil PO token provider (used via the yt-dlp plugin) |
 | `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`); needed to bypass a blocked VPS IP |
-| `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day (in-memory, per instance) |
+| `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day |
+| `MAX_VIDEO_DURATION` | `10800` | Max allowed video length in seconds (0 = unlimited) |
+| `DATA_DIR` | `/data` (Docker) | Where per-IP rate-limit state is persisted; mount a volume here to keep it across redeploys |
+| `INFO_RATE_PER_MIN` | `30` | Max `/api/info` (preview) requests per IP per minute |
+| `YTDLP_AUTO_UPDATE` | `true` | Update yt-dlp + bgutil plugin on container start |
 | `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
 
 > **Local development on a residential IP** needs none of these — yt-dlp's default web

@@ -30,16 +30,24 @@ RUN python3 -m venv /opt/ytdlp && \
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# Let the runtime user update the venv (yt-dlp auto-update on start) and own the
+# data dir used for persistent rate-limit state.
+RUN chown -R nextjs:nodejs /opt/ytdlp && \
+    mkdir -p /data && chown -R nextjs:nodejs /data
+
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    YT_DLP_BIN=/opt/ytdlp/bin/yt-dlp
+    YT_DLP_BIN=/opt/ytdlp/bin/yt-dlp \
+    YTDLP_AUTO_UPDATE=true \
+    DATA_DIR=/data
 
 # Copy standalone Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
-CMD ["node", "server.js"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

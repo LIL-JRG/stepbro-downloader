@@ -16,11 +16,13 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       placeholder: 'Pega aquí la URL del video…',
       paste: 'Pegar del portapapeles',
     },
-    form: { best: 'Mejor', download: 'Descargar', downloading: 'Descargando…' },
+    form: { best: 'Mejor', download: 'Descargar', downloading: 'Descargando…', cancel: 'Cancelar' },
     usage: {
       left: '{remaining} de {limit} descargas restantes hoy',
       reached: 'Límite diario alcanzado — se reinicia mañana',
+      tooLong: 'Video demasiado largo (máx {hours}h)',
     },
+    progress: { processing: 'Procesando…' },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {
       text: 'Confirmo que he leído y acepto los términos de derechos de autor y no descargaré contenido con derechos de autor.',

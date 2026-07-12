@@ -1,5 +1,6 @@
-import { rm } from 'fs/promises'
-import { dirname } from 'path'
+import { readdir, rm } from 'fs/promises'
+import { tmpdir } from 'os'
+import { dirname, join } from 'path'
 
 interface TempEntry {
   filePath: string
@@ -37,4 +38,23 @@ export function claimTempFile(token: string): { filePath: string; filename: stri
   clearTimeout(entry.ttlTimeout)
   store.delete(token)
   return { filePath: entry.filePath, filename: entry.filename }
+}
+
+/**
+ * Remove leftover `ytdlp-*` temp dirs from a previous process. The in-memory
+ * store doesn't survive restarts, so any such dir on disk at startup is an
+ * orphan (its TTL timeout and token are gone). Called once from instrumentation.
+ */
+export async function cleanupOrphanTempDirs() {
+  try {
+    const base = tmpdir()
+    const entries = await readdir(base, { withFileTypes: true })
+    await Promise.all(
+      entries
+        .filter((e) => e.isDirectory() && e.name.startsWith('ytdlp-'))
+        .map((e) => rm(join(base, e.name), { recursive: true, force: true }).catch(() => {}))
+    )
+  } catch {
+    /* ignore */
+  }
 }

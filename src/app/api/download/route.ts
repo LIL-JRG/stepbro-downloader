@@ -1,12 +1,12 @@
 import { spawn } from 'child_process'
-import { mkdtemp, readdir, stat } from 'fs/promises'
+import { mkdtemp, readdir, rm, stat } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { v4 as uuid } from 'uuid'
 import type { NextRequest } from 'next/server'
 import { registerTempFile } from '@/lib/temp-store'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
-import { getClientIp, peekLimit, consumeLimit } from '@/lib/rate-limit'
+import { getClientIp, peekLimit, consumeLimit, MAX_VIDEO_DURATION } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -58,6 +58,9 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
   const ffmpegBin = process.env.FFMPEG_BIN
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
+  // Anti-abuse backstop: refuse videos longer than the cap (client gates too).
+  if (MAX_VIDEO_DURATION > 0) args.push('--match-filters', `duration<=${MAX_VIDEO_DURATION}`)
+
   args.push(...await commonYtdlpArgs())
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
   return args
@@ -101,11 +104,15 @@ export async function POST(request: NextRequest) {
 
   const args = await buildArgs(opts, tempDir)
 
+  let proc: ReturnType<typeof spawn> | null = null
+  let registered = false
+
   const stream = new ReadableStream({
     start(controller) {
-      const proc = spawn(ytdlpBin(), args)
+      const p = spawn(ytdlpBin(), args)
+      proc = p
 
-      proc.stdout.on('data', (data: Buffer) => {
+      p.stdout.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n')
         for (const line of lines) {
           const trimmed = line.trim()
@@ -127,12 +134,12 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      proc.stderr.on('data', (data: Buffer) => {
+      p.stderr.on('data', (data: Buffer) => {
         const msg = data.toString().trim()
         if (msg) sendEvent(controller, encoder, { type: 'error', message: msg })
       })
 
-      proc.on('close', async (code) => {
+      p.on('close', async (code) => {
         if (code === 0) {
           try {
             // Find the downloaded file (largest non-temp file in the dir)
@@ -144,10 +151,17 @@ export async function POST(request: NextRequest) {
             )
             const largest = files.sort((a, b) => b.size - a.size)[0]
 
-            if (!largest) throw new Error('No output file found')
+            if (!largest) {
+              throw new Error(
+                MAX_VIDEO_DURATION > 0
+                  ? `No file produced — the video may exceed the maximum allowed length (${Math.floor(MAX_VIDEO_DURATION / 3600)}h).`
+                  : 'No output file found'
+              )
+            }
 
             const filePath = join(tempDir, largest.f)
             registerTempFile(token, filePath, largest.f)
+            registered = true
             // Count this successful download against the daily limit.
             const usage = consumeLimit(clientIp)
             sendEvent(controller, encoder, {
@@ -172,7 +186,7 @@ export async function POST(request: NextRequest) {
         controller.close()
       })
 
-      proc.on('error', (err) => {
+      p.on('error', (err) => {
         sendEvent(controller, encoder, {
           type: 'error',
           message: err.message.includes('ENOENT')
@@ -181,6 +195,14 @@ export async function POST(request: NextRequest) {
         })
         controller.close()
       })
+    },
+    // Fired when the client aborts (cancel button / navigation). Kill the yt-dlp
+    // process and drop the temp dir unless the file was already handed off.
+    cancel() {
+      if (proc && proc.exitCode === null) {
+        try { proc.kill('SIGKILL') } catch { /* already gone */ }
+      }
+      if (!registered) rm(tempDir, { recursive: true, force: true }).catch(() => {})
     },
   })
 
