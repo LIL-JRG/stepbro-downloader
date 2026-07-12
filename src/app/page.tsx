@@ -134,19 +134,21 @@ export default function Home() {
 
   return (
     <div className="flex min-h-svh flex-col bg-page">
-      <header className="flex items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
-        <span className="font-display text-lg font-bold tracking-tight text-white">
-          stepbro downloader
-        </span>
-        <div className="flex items-center gap-2 text-white">
-          <a href={DONATE_URL} target="_blank" rel="noopener noreferrer">
-            <Button className="h-8 gap-1.5 rounded-full bg-amber-400 px-3.5 font-semibold text-amber-950 hover:bg-amber-300">
-              <Heart className="size-3.5" />
-              <span className="hidden sm:inline">Donate</span>
-            </Button>
-          </a>
-          <LanguageSelector />
-          <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
+      <header className="px-4 py-3.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-2">
+          <span className="font-display text-lg font-bold tracking-tight text-white">
+            stepbro downloader
+          </span>
+          <div className="flex items-center gap-2 text-white">
+            <a href={DONATE_URL} target="_blank" rel="noopener noreferrer">
+              <Button className="h-8 gap-1.5 rounded-full bg-amber-400 px-3.5 font-semibold text-amber-950 hover:bg-amber-300">
+                <Heart className="size-3.5" />
+                <span className="hidden sm:inline">Donate</span>
+              </Button>
+            </a>
+            <LanguageSelector />
+            <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
+          </div>
         </div>
       </header>
 
