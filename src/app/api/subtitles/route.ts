@@ -8,6 +8,49 @@ import { getClientIp, allowInfoRequest } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
+function toMs(t: string): number {
+  const m = t.match(/(\d+):(\d+):(\d+)[,.](\d+)/)
+  if (!m) return 0
+  return +m[1] * 3600000 + +m[2] * 60000 + +m[3] * 1000 + +m[4]
+}
+
+/**
+ * YouTube auto-captions arrive "rolling": each cue repeats the previous line plus
+ * a new one, interleaved with ~10ms transition cues, so a raw SRT conversion is
+ * full of duplicates. Detect that pattern (lots of micro-cues) and collapse it —
+ * drop the micro-cues and keep only each cue's newly-added lines. Clean manual
+ * subtitles are left untouched.
+ */
+function cleanSrt(srt: string): string {
+  const blocks = srt.replace(/\r/g, '').trim().split(/\n\n+/)
+  const cues: { start: string; end: string; lines: string[]; dur: number }[] = []
+  for (const b of blocks) {
+    const lines = b.split('\n')
+    const tIdx = lines.findIndex((l) => l.includes('-->'))
+    if (tIdx === -1) continue
+    const [start, end] = lines[tIdx].split('-->').map((s) => s.trim())
+    const text = lines.slice(tIdx + 1).map((s) => s.trim()).filter(Boolean)
+    if (!start || !end || text.length === 0) continue
+    cues.push({ start, end, lines: text, dur: toMs(end) - toMs(start) })
+  }
+  if (cues.length === 0) return srt
+
+  const micro = cues.filter((c) => c.dur < 100).length
+  if (micro < cues.length * 0.2) return srt // not rolling ASR — leave as-is
+
+  const out: { start: string; end: string; text: string }[] = []
+  let prev: string[] = []
+  for (const c of cues) {
+    if (c.dur < 100) continue
+    const fresh = c.lines.filter((l) => !prev.includes(l))
+    prev = c.lines
+    if (fresh.length === 0) continue
+    out.push({ start: c.start, end: c.end, text: fresh.join('\n') })
+  }
+  if (out.length === 0) return srt
+  return out.map((c, i) => `${i + 1}\n${c.start} --> ${c.end}\n${c.text}`).join('\n\n') + '\n'
+}
+
 // Fetch a single subtitle track and return it as SRT text (or an attachment).
 // GET /api/subtitles?url=<video>&lang=<code>[&download=1]
 export async function GET(request: NextRequest) {
@@ -58,7 +101,7 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'No subtitles available for that language' }, { status: 404 })
     }
 
-    const srt = await readFile(join(dir, srtFile), 'utf8')
+    const srt = cleanSrt(await readFile(join(dir, srtFile), 'utf8'))
 
     if (download) {
       return new Response(srt, {
