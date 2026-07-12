@@ -18,11 +18,13 @@ WORKDIR /app
 # System deps: ffmpeg for merging, python3 for yt-dlp + plugins
 RUN apk add --no-cache ffmpeg python3 ca-certificates
 
-# Install yt-dlp and the bgutil PO token provider in a virtualenv.
+# Install yt-dlp and the bgutil PO token provider PLUGIN in a virtualenv.
 # Using a venv guarantees both packages share the same Python environment
-# so yt-dlp's plugin discovery finds bgutil automatically.
+# so yt-dlp's plugin discovery finds bgutil automatically. The plugin fetches
+# player AND gvs PO tokens from the provider server (BGUTIL_URL), which is what
+# unlocks downloadable (non-SABR) formats on low-trust IPs.
 RUN python3 -m venv /opt/ytdlp && \
-    /opt/ytdlp/bin/pip install yt-dlp
+    /opt/ytdlp/bin/pip install yt-dlp bgutil-ytdlp-pot-provider
 
 # Non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \

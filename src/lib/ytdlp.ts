@@ -3,41 +3,6 @@
  * Centralised here so info and download routes stay in sync.
  */
 
-interface BgutilWebTokens {
-  poToken: string
-  visitorData: string
-}
-
-// ── bgutil web token cache (6 hours) ─────────────────────────────────────────
-let _cachedWebTokens: BgutilWebTokens | null = null
-let _cachedWebAt = 0
-const TOKEN_CACHE_MS = 6 * 60 * 60 * 1000
-
-async function fetchBgutilWebTokens(baseUrl: string): Promise<BgutilWebTokens | null> {
-  const now = Date.now()
-  if (_cachedWebTokens && now - _cachedWebAt < TOKEN_CACHE_MS) return _cachedWebTokens
-
-  try {
-    const res = await fetch(`${baseUrl}/get_pot`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-      signal: AbortSignal.timeout(120_000),
-    })
-    if (!res.ok) return null
-    const data = await res.json() as Record<string, string>
-    const poToken = data.poToken ?? data.po_token
-    const visitorData = data.contentBinding ?? data.visitorData ?? data.visitor_data ?? ''
-    if (!poToken) return null
-    _cachedWebTokens = { poToken, visitorData: decodeURIComponent(visitorData) }
-    _cachedWebAt = now
-    return _cachedWebTokens
-  } catch {
-    return null
-  }
-}
-
-// ── Main args builder ─────────────────────────────────────────────────────────
 export async function commonYtdlpArgs(): Promise<string[]> {
   const args: string[] = []
 
@@ -47,12 +12,10 @@ export async function commonYtdlpArgs(): Promise<string[]> {
 
   // Route ALL outbound yt-dlp traffic through a forward proxy when configured.
   // On a heavily flagged datacenter IP, YouTube returns "Sign in to confirm you're
-  // not a bot" for every client — even with valid cookies or a bgutil PO token —
-  // because the block is IP-based. Sending requests through a residential/mobile
-  // proxy (or a self-hosted proxy on a residential connection) is the only reliable
-  // fix. Accepts any yt-dlp --proxy URL, e.g. http://user:pass@host:port or
-  // socks5://host:port. Applied first so it covers the cookies, bgutil and default
-  // branches alike.
+  // not a bot" for every client. Sending requests through a residential/mobile
+  // proxy (or Cloudflare WARP) gets past that block. Accepts any yt-dlp --proxy URL,
+  // e.g. http://user:pass@host:port or socks5://host:port. Applied first so it
+  // covers every request.
   if (proxy) args.push('--proxy', proxy)
 
   // Resolve the JS runtime to the Node binary actually running this process.
@@ -63,55 +26,29 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   args.push('--js-runtimes', `node:${process.execPath}`)
   args.push('--remote-components', 'ejs:github')
 
+  // bgutil PO token provider — via the yt-dlp plugin, NOT manual token passing.
+  //
+  // On a low-trust IP (e.g. a datacenter, or Cloudflare WARP) YouTube serves
+  // SABR-only streams whose media URLs are withheld unless the request carries a
+  // GVS (Google Video Server) PO token. Without it yt-dlp reports "Only images are
+  // available" / "formats ... missing a URL" and quality collapses to storyboards
+  // or format 18.
+  //
+  // The bgutil-ytdlp-pot-provider PLUGIN (installed in the same venv as yt-dlp,
+  // see Dockerfile) hooks into yt-dlp's PO Token Provider Framework and fetches
+  // BOTH the player and gvs tokens from the provider server automatically, with the
+  // correct content bindings. We only need to point it at the provider's base_url.
+  // Manual po_token / visitor_data / player_skip args are intentionally gone — they
+  // only ever supplied the player token, which is why GVS/SABR formats were dropped.
+  if (bgutilUrl) {
+    args.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${bgutilUrl}`)
+  }
+
+  // Cookies are optional and additive: with a valid signed-in session yt-dlp gets
+  // the account context (and the plugin binds tokens to the account session id).
+  // Safe to run alongside the plugin; leave unset to rely on bgutil + proxy alone.
   if (cookiesFile) {
-    // Cookies strategy: let yt-dlp work normally with a logged-in session.
-    //
-    // With valid account cookies the YouTube watch page loads without any bot
-    // check (signed-in users are never shown "Sign in to confirm"). This means:
-    //   1. yt-dlp fetches the watch page and extracts data_sync_id + visitor_data
-    //      from the page config — this is what links the request to the account.
-    //   2. player.js is fetched and the n-challenge is solved via --remote-components.
-    //   3. The player API receives a fully authenticated request and returns the
-    //      complete adaptive format list.
-    //
-    // Why NOT player_skip=webpage,configs here:
-    //   player_skip skips the watch page, so yt-dlp never gets data_sync_id.
-    //   Without data_sync_id YouTube ignores the account context and serves only
-    //   format 18 — the same degraded response as unauthenticated requests.
-    //
-    // Why NOT bgutil tokens alongside cookies:
-    //   bgutil provides its own visitor_data which must form a matched pair with
-    //   its po_token. If bgutil visitor_data is passed while the page's own
-    //   visitor_data is also fetched, yt-dlp warns about the missing data_sync_id
-    //   and the result is again format 18 only.
     args.push('--cookies', cookiesFile)
-    args.push('--extractor-args', 'youtube:player_client=web')
-    args.push('--extractor-args', 'youtubetab:skip=webpage')
-  } else if (bgutilUrl) {
-    // No cookies: unauthenticated requests from this VPS IP are blocked at the
-    // watch page. Use bgutil PO tokens with player_skip=webpage,configs to skip
-    // the page (avoiding the IP block) while still providing anti-bot proof.
-    const tokens = await fetchBgutilWebTokens(bgutilUrl)
-    if (tokens?.visitorData) {
-      args.push(
-        '--extractor-args',
-        `youtube:player_client=web;po_token=web+${tokens.poToken};visitor_data=${tokens.visitorData};player_skip=webpage,configs`,
-      )
-    } else {
-      args.push('--extractor-args', 'youtube:player_client=ios,android')
-    }
-    args.push('--extractor-args', 'youtubetab:skip=webpage')
-  } else {
-    // No cookies, no bgutil: let yt-dlp use its default (web) client.
-    //
-    // On a residential IP (local dev, or a home-server deploy) the default web
-    // client is NOT bot-blocked and returns the full adaptive format list (up to
-    // 4K). Forcing player_client=ios,android here is actively harmful — YouTube
-    // now caps those clients (without a PO token) to format 18 only, i.e. 360p.
-    //
-    // On a datacenter IP the web client would be blocked, so this branch is only a
-    // last resort: production is expected to configure bgutil (or cookies) above.
-    // We push no player_client and rely on yt-dlp's default.
   }
 
   return args

@@ -60,12 +60,9 @@ export async function GET(request: NextRequest) {
   //                          (avoids watch-page bot check, goes direct to android API)
   //  formatsIosNoPage      — ios with player_skip=webpage
   //                          (same, but ios for HLS streams)
-  //  formatsBgutil         — web client with the bgutil PO token + visitor_data
-  //                          and player_skip=webpage,configs. This is the datacenter
-  //                          strategy; the four tests above never exercise it because
-  //                          cookies take priority in commonYtdlpArgs(). Tested here
-  //                          in isolation (no cookies) so we can see whether bgutil
-  //                          alone bypasses the bot check even while cookies are set.
+  //  formatsBgutil         — bgutil PLUGIN (base_url) with the mweb client, the
+  //                          setup yt-dlp recommends for GVS PO tokens. Run without
+  //                          cookies so we can see the plugin path in isolation.
   let formatsCurrentConfig: string | null = null
   let formatsWebCookiesOnly: string | null = null
   let formatsAndroidNoPage: string | null = null
@@ -73,25 +70,18 @@ export async function GET(request: NextRequest) {
   let formatsBgutil: string | null = null
 
   if (testUrl) {
-    // Build the exact bgutil branch args from the tokens fetched above.
-    const tok = (bgutilWebTokens && typeof bgutilWebTokens === 'object')
-      ? bgutilWebTokens as Record<string, string>
-      : null
-    const poToken = tok?.poToken ?? tok?.po_token
-    const visitorData = decodeURIComponent(
-      tok?.contentBinding ?? tok?.visitorData ?? tok?.visitor_data ?? ''
-    )
-    const bgutilPromise = (poToken && visitorData)
+    // bgutil via the yt-dlp plugin (base_url) + mweb client — the recommended GVS
+    // PO token setup. Requires the plugin installed in the yt-dlp venv (Dockerfile).
+    const bgutilPromise = bgutilUrl
       ? runCommand(bin, [
           ...proxyArgs,
           '--js-runtimes', `node:${process.execPath}`,
           '--remote-components', 'ejs:github',
-          '--extractor-args',
-          `youtube:player_client=web;po_token=web+${poToken};visitor_data=${visitorData};player_skip=webpage,configs`,
-          '--extractor-args', 'youtubetab:skip=webpage',
+          '--extractor-args', `youtubepot-bgutilhttp:base_url=${bgutilUrl}`,
+          '--extractor-args', 'youtube:player_client=mweb',
           '--list-formats', '--no-playlist', testUrl,
         ])
-      : Promise.resolve('bgutil not configured or returned no tokens')
+      : Promise.resolve('bgutil not configured')
 
     const [a, b, c, d, e] = await Promise.all([
       runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
