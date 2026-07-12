@@ -15,6 +15,7 @@ import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide
 
 // Where the Donate button points — change to your own sponsor/donation page.
 const DONATE_URL = 'https://github.com/sponsors/LIL-JRG'
+const CONSENT_KEY = 'stepbro-consent'
 
 function looksLikeUrl(s: string): boolean {
   return /^https?:\/\/\S+\.\S+/i.test(s.trim())
@@ -26,6 +27,19 @@ export default function Home() {
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [agreed, setAgreed] = useState(true)
+
+  // Remember the copyright consent across visits (deferred restore for hydration
+  // safety + to avoid a synchronous setState in the effect body).
+  useEffect(() => {
+    const stored = localStorage.getItem(CONSENT_KEY)
+    if (stored !== null) queueMicrotask(() => setAgreed(stored === 'true'))
+  }, [])
+
+  function toggleAgreed() {
+    const next = !agreed
+    setAgreed(next)
+    localStorage.setItem(CONSENT_KEY, String(next))
+  }
 
   // Auto-fetch a preview once the URL looks valid — no explicit "Fetch" step.
   // All state updates happen inside the deferred timer (never synchronously in the
@@ -76,6 +90,10 @@ export default function Home() {
 
   function handleDownload(config: DownloadConfig) {
     if (isDownloading) return
+    if (!agreed) {
+      toast.error('Please accept the copyright terms first')
+      return
+    }
     if (!config.url) {
       toast.error('Paste a video URL first')
       return
@@ -189,6 +207,7 @@ export default function Home() {
                 targetUrl={targetUrl}
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
+                blocked={!agreed}
               />
             </div>
 
@@ -196,7 +215,7 @@ export default function Home() {
             <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-muted/70 px-4 py-3">
               <button
                 type="button"
-                onClick={() => setAgreed((v) => !v)}
+                onClick={toggleAgreed}
                 aria-pressed={agreed}
                 aria-label="I agree"
                 className={cn(

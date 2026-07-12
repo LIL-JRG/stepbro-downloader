@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -25,7 +25,11 @@ interface DownloadFormProps {
   targetUrl: string
   onDownload: (config: DownloadConfig) => void
   isDownloading: boolean
+  /** When true (e.g. disclaimer not accepted), the Download button is disabled. */
+  blocked?: boolean
 }
+
+const PREFS_KEY = 'stepbro-prefs'
 
 const VIDEO_QUALITY = [
   { label: 'Best', value: 'best' },
@@ -59,14 +63,42 @@ const AUDIO_FORMAT = [
   { label: 'WAV', value: 'wav' },
 ]
 
-export function DownloadForm({ targetUrl, onDownload, isDownloading }: DownloadFormProps) {
+export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: DownloadFormProps) {
   const [mode, setMode] = useState<'mp4' | 'mp3'>('mp4')
   const [videoQuality, setVideoQuality] = useState('best')
   const [container, setContainer] = useState('mp4')
   const [audioBitrate, setAudioBitrate] = useState('best')
   const [audioFormat, setAudioFormat] = useState('mp3')
+  const [hydrated, setHydrated] = useState(false)
 
-  const disabled = isDownloading || !targetUrl
+  // Restore the last-used choices (deferred so it doesn't fire as a synchronous
+  // setState in the effect body, and stays hydration-safe).
+  useEffect(() => {
+    let stored: Record<string, unknown> | null = null
+    try {
+      const raw = localStorage.getItem(PREFS_KEY)
+      stored = raw ? JSON.parse(raw) : null
+    } catch { /* ignore malformed prefs */ }
+    queueMicrotask(() => {
+      if (stored) {
+        if (stored.mode === 'mp3' || stored.mode === 'mp4') setMode(stored.mode)
+        if (VIDEO_QUALITY.some((o) => o.value === stored!.videoQuality)) setVideoQuality(stored.videoQuality as string)
+        if (CONTAINER.some((o) => o.value === stored!.container)) setContainer(stored.container as string)
+        if (AUDIO_BITRATE.some((o) => o.value === stored!.audioBitrate)) setAudioBitrate(stored.audioBitrate as string)
+        if (AUDIO_FORMAT.some((o) => o.value === stored!.audioFormat)) setAudioFormat(stored.audioFormat as string)
+      }
+      setHydrated(true)
+    })
+  }, [])
+
+  // Persist choices once restored (localStorage write is external sync, not setState).
+  useEffect(() => {
+    if (!hydrated) return
+    const prefs = { version: 1, mode, videoQuality, container, audioBitrate, audioFormat }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  }, [hydrated, mode, videoQuality, container, audioBitrate, audioFormat])
+
+  const disabled = isDownloading || !targetUrl || !!blocked
 
   // First dropdown = quality, second = format — mirrors ytmp3's two-select row.
   const primary = mode === 'mp4' ? VIDEO_QUALITY : AUDIO_BITRATE
