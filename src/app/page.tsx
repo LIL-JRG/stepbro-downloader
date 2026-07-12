@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
-import { ExternalLink, Loader2, Download } from 'lucide-react'
+import { ExternalLink, Loader2, Download, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
 
 function looksLikeUrl(s: string): boolean {
   return /^https?:\/\/\S+\.\S+/i.test(s.trim())
@@ -19,6 +20,7 @@ export default function Home() {
   const [videoData, setVideoData] = useState<VideoData | null>(null)
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [agreed, setAgreed] = useState(true)
 
   // Auto-fetch a preview once the URL looks valid — no explicit "Fetch" step.
   // All state updates happen inside the deferred timer (never synchronously in the
@@ -57,6 +59,15 @@ export default function Home() {
 
   // Download uses the canonical webpage_url when we have a preview, else the raw input.
   const targetUrl = videoData?.webpage_url ?? url.trim()
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) setUrl(text.trim())
+    } catch {
+      toast.error('Clipboard access is blocked by the browser')
+    }
+  }
 
   function handleDownload(config: DownloadConfig) {
     if (isDownloading) return
@@ -118,12 +129,12 @@ export default function Home() {
 
   return (
     <div className="flex min-h-svh flex-col bg-page">
-      <header className="flex items-center justify-between px-4 py-3 sm:px-6">
+      <header className="flex items-center justify-between px-4 py-3.5 sm:px-6">
         <div className="flex items-center gap-2 text-white">
-          <span className="grid size-8 place-items-center rounded-xl bg-white/15">
+          <span className="grid size-8 place-items-center rounded-xl bg-white/20">
             <Download className="size-4" />
           </span>
-          <span className="font-display text-lg font-semibold tracking-tight">
+          <span className="font-display text-lg font-bold tracking-tight">
             stepbro downloader
           </span>
         </div>
@@ -134,40 +145,95 @@ export default function Home() {
             rel="noopener noreferrer"
             aria-label="stepbro downloader on GitHub"
           >
-            <Button variant="ghost" size="icon" className="size-8 text-white hover:bg-white/15 hover:text-white">
+            <Button variant="ghost" size="icon" className="size-8 text-white hover:bg-white/20 hover:text-white">
               <ExternalLink className="size-4" />
             </Button>
           </a>
-          <ThemeToggle className="text-white hover:bg-white/15 hover:text-white" />
+          <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
         </div>
       </header>
 
       <main className="flex-1 px-4 pb-16">
-        <div className="mx-auto w-full max-w-xl pt-10 sm:pt-16">
+        <div className="mx-auto w-full max-w-2xl pt-6 sm:pt-12">
           {/* Main converter card */}
-          <div className="rounded-3xl bg-card p-5 shadow-xl shadow-black/10 ring-1 ring-black/5 dark:ring-white/10 sm:p-7">
+          <div className="rounded-3xl bg-card p-5 shadow-2xl shadow-black/20 ring-1 ring-black/5 dark:ring-white/10 sm:p-7">
             <div className="mb-5 space-y-1.5 text-center">
-              <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-[26px]">
+              <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground sm:text-3xl">
                 Download any video
               </h1>
               <p className="text-sm text-muted-foreground">
-                Paste a link from YouTube, TikTok, X, Instagram &amp; more
+                YouTube, TikTok, X, Instagram &amp; more — MP4 or MP3, up to 4K
               </p>
             </div>
 
-            <Input
-              placeholder="Paste the video URL here…"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="mb-3 h-12 rounded-full border-transparent bg-muted px-5 text-base focus-visible:bg-background"
-              autoFocus
-            />
+            {/* URL input with a paste button */}
+            <div className="relative">
+              <Input
+                placeholder="Paste the video URL here…"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="h-12 rounded-full border-transparent bg-muted pr-12 pl-5 text-base shadow-inner focus-visible:bg-background"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                aria-label="Paste from clipboard"
+                className="absolute top-1/2 right-1.5 grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              >
+                <Clipboard className="size-4" />
+              </button>
+            </div>
 
-            <DownloadForm
-              targetUrl={targetUrl}
-              onDownload={handleDownload}
-              isDownloading={isDownloading}
-            />
+            <div className="mt-3">
+              <DownloadForm
+                targetUrl={targetUrl}
+                onDownload={handleDownload}
+                isDownloading={isDownloading}
+              />
+            </div>
+
+            {/* Disclaimer */}
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-muted/70 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setAgreed((v) => !v)}
+                aria-pressed={agreed}
+                aria-label="I agree"
+                className={cn(
+                  'mt-0.5 grid size-4 shrink-0 place-items-center rounded-[5px] border transition-colors',
+                  agreed ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'
+                )}
+              >
+                {agreed && <Check className="size-3" />}
+              </button>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                I confirm I have read and agree to the{' '}
+                <a href="#" className="font-medium text-foreground underline-offset-2 hover:underline">
+                  copyright terms
+                </a>{' '}
+                and will not download copyrighted content.
+              </p>
+            </div>
+
+            <p className="mt-2.5 text-center text-xs text-muted-foreground">
+              <a href="#" className="inline-flex items-center gap-1 hover:text-foreground">
+                <Flag className="size-3" /> Report copyrighted content
+              </a>
+            </p>
+          </div>
+
+          {/* Feature pills */}
+          <div className="mx-auto mt-4 flex flex-wrap items-center justify-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 font-medium text-white backdrop-blur">
+              <Zap className="size-3.5" /> Fast &amp; free
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 font-semibold text-foreground shadow-lg">
+              <Film className="size-3.5" /> Up to 4K with audio
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 font-medium text-white backdrop-blur">
+              <Music className="size-3.5" /> MP3 audio
+            </span>
           </div>
 
           {/* Live preview */}
@@ -179,7 +245,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.2 }}
-                className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-card/70 py-5 text-sm text-muted-foreground shadow-lg shadow-black/5"
+                className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-card/80 py-5 text-sm text-muted-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 dark:ring-white/10"
               >
                 <Loader2 className="size-4 animate-spin" />
                 Loading preview…

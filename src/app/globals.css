@@ -36,8 +36,8 @@
 
 :root {
   --radius: 0.9rem;
-  /* Blue page canvas behind the white card (ytmp3-inspired). */
-  --page: oklch(0.64 0.166 259);
+  /* Bright cornflower-blue page canvas behind the white card (ytmp3-inspired). */
+  --page: oklch(0.62 0.19 262);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
