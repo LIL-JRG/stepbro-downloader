@@ -114,11 +114,21 @@ This starts both the app on port 3000 and the bgutil PO token provider. `BGUTIL_
 
 The app listens on port 3000 internally. No volumes required for basic usage.
 
-#### 2. (Optional) YouTube bot detection bypass
+#### 2. (Recommended) YouTube on a VPS: PO tokens + proxy
 
-VPS IPs are often flagged by YouTube. Two complementary options:
+YouTube blocks datacenter IPs in **two layers**, and a VPS usually hits both:
 
-**Option A — bgutil PO token provider**
+1. **The bot check** — unauthenticated requests from a flagged IP get *"Sign in to
+   confirm you're not a bot"*.
+2. **SABR-only streaming** — even once past the bot check, a low-trust IP is served
+   SABR streams whose media URLs are withheld unless the request carries a **GVS PO
+   token**. Without it yt-dlp reports *"Only images are available"* and quality
+   collapses to storyboards or a single 360p stream.
+
+You need to address both. In practice: **bgutil** (for the PO/GVS tokens) **+ a proxy**
+(to get past the IP block).
+
+**A — bgutil PO token provider (handles the tokens)**
 
 1. Create a new **Docker Compose** service in Dokploy, point it to this repo, and set **Compose path** to `./docker-compose.bgutil.yml`
 2. Deploy it
@@ -128,25 +138,44 @@ VPS IPs are often flagged by YouTube. Two complementary options:
    ```
 4. Redeploy the app
 
-The bgutil container generates YouTube PO tokens. The app fetches them automatically and caches them for 6 hours. The first request may take up to 2 minutes while bgutil initializes.
+The app installs the `bgutil-ytdlp-pot-provider` **yt-dlp plugin** (see the Dockerfile),
+which fetches both the `player` and `gvs` PO tokens from the container automatically.
+The first request may take up to 2 minutes while bgutil initializes.
 
-**Option B — YouTube cookies**
+**B — Outbound proxy to bypass the IP block (`YTDLP_PROXY`)**
 
-Export your YouTube cookies in Netscape format (e.g. with a browser extension like [Get cookies.txt](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)), then:
+The bot check is IP-based, so it cannot be solved from the VPS itself — outbound
+requests must leave through a less-flagged IP. Two ways:
+
+- **Cloudflare WARP (free, runs on the VPS).** Deploy `./docker-compose.warp.yml` as a
+  separate Docker Compose service in Dokploy, then set on the app:
+  ```
+  YTDLP_PROXY=socks5://warp:1080
+  ```
+  WARP's egress is usually trusted enough to clear the bot check. Reliability is
+  best-effort — verify with the debug endpoint.
+- **Residential/mobile proxy (paid, most robust).** Point `YTDLP_PROXY` at any
+  `http://user:pass@host:port` or `socks5://host:port` residential proxy.
+
+**C — (Optional) YouTube cookies**
+
+Cookies are no longer required, but a valid signed-in session can still help. Export
+them in Netscape format (e.g. with [Get cookies.txt](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)) — from a private/incognito window that you close immediately after exporting, or the session rotates and the cookies stop authenticating — then:
 
 1. Upload the cookies file to your VPS (e.g. `/data/cookies/youtube-cookies.txt`)
 2. In Dokploy, add a bind mount: host `/data/cookies` → container `/cookies`
-3. Add the environment variable:
-   ```
-   YOUTUBE_COOKIES_FILE=/cookies/youtube-cookies.txt
-   ```
-4. Redeploy the app
+3. Set `YOUTUBE_COOKIES_FILE=/cookies/youtube-cookies.txt` and redeploy
 
-> Both options can be used together. When a cookies file is configured, the app uses the web player client with the full signed-in session (recommended). When only bgutil is configured, the app supplies its PO tokens directly bypassing the YouTube page.
+> **Recommended VPS setup:** bgutil (`BGUTIL_URL`) + WARP (`YTDLP_PROXY`). This clears
+> both the bot check and the SABR/GVS restriction, returning the full format list up
+> to 4K without any account cookies.
 
 #### Debug endpoint
 
-`GET /api/debug` returns the yt-dlp version, bgutil connectivity status, and the tokens received — useful for verifying your setup after deploy.
+`GET /api/debug` returns the yt-dlp version, the active proxy, bgutil connectivity
+status, and the tokens received. Add `?url=<youtube_url>` to compare the format lists
+produced by each strategy — the quickest way to verify your setup after deploy (look
+for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards).
 
 ## Environment Variables
 
@@ -154,8 +183,13 @@ Export your YouTube cookies in Netscape format (e.g. with a browser extension li
 |---|---|---|
 | `YT_DLP_BIN` | `yt-dlp` | Path to the yt-dlp binary |
 | `FFMPEG_BIN` | *(system PATH)* | Path to the ffmpeg binary |
-| `BGUTIL_URL` | *(disabled)* | URL of the bgutil PO token provider |
-| `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file |
+| `BGUTIL_URL` | *(disabled)* | URL of the bgutil PO token provider (used via the yt-dlp plugin) |
+| `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`); needed to bypass a blocked VPS IP |
+| `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
+
+> **Local development on a residential IP** needs none of these — yt-dlp's default web
+> client returns the full format list. `BGUTIL_URL` + `YTDLP_PROXY` are only for
+> datacenter/VPS deployments that YouTube blocks.
 
 ## Built With
 
