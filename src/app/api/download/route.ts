@@ -48,7 +48,12 @@ function buildArgs(opts: DownloadOptions, outDir: string, shared: string[]): str
       videoPref = 'bv*'
       audioExt = 'm4a'
     } else {
-      videoPref = 'bv*[vcodec^=avc1]'
+      // MP4: H.264 is universal but YouTube caps it at 1080p. So force H.264 only
+      // when the requested resolution is ≤1080p; for "Best" or 1440p/4K keep the
+      // real resolution (VP9/AV1 in MP4 — plays in modern players & VLC), since no
+      // H.264 exists above 1080p. The -S sort still prefers H.264 at equal res.
+      const qNum = quality === 'best' ? Infinity : Number(quality)
+      videoPref = qNum <= 1080 ? 'bv*[vcodec^=avc1]' : 'bv*'
       audioExt = 'm4a'
     }
 

@@ -39,6 +39,7 @@ export const en = {
     downloadSrt: 'Download .srt',
     none: 'No subtitles available',
     another: 'Download another',
+    auto: 'auto',
   },
   preview: {
     loading: 'Loading preview…',

@@ -35,6 +35,7 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       downloadSrt: 'Descargar .srt',
       none: 'No hay subtítulos disponibles',
       another: 'Descargar otro',
+      auto: 'auto',
     },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {

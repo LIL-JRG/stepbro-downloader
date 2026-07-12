@@ -61,6 +61,19 @@ export async function POST(request: NextRequest) {
 
       try {
         const info = JSON.parse(chunks.join(''))
+
+        // Manual subs are few; auto-captions can be ~140 (mostly auto-translations),
+        // so surface a curated set: the video's own language + common languages.
+        const manualLangs = Object.keys(info.subtitles ?? {}).filter((l: string) => l !== 'live_chat')
+        const autoAll = Object.keys(info.automatic_captions ?? {})
+        const COMMON = ['en', 'es', 'pt', 'fr', 'de', 'it', 'ru', 'ja', 'ko', 'ar', 'hi', 'id']
+        const source = typeof info.language === 'string' ? info.language : null
+        const autoLangs = autoAll.length
+          ? [...new Set([source, 'en', ...COMMON].filter(Boolean) as string[])].filter((l) =>
+              autoAll.includes(l)
+            )
+          : []
+
         const body = {
           id: info.id,
           title: info.title,
@@ -74,7 +87,8 @@ export async function POST(request: NextRequest) {
           description: info.description,
           webpage_url: info.webpage_url,
           extractor: info.extractor,
-          subtitleLangs: Object.keys(info.subtitles ?? {}).filter((l: string) => l !== 'live_chat'),
+          subtitleLangs: manualLangs,
+          autoSubLangs: autoLangs,
           formats: (info.formats || []).map((f: RawFormat) => ({
             format_id: f.format_id,
             format_note: f.format_note,

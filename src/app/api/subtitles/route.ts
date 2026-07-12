@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       ...(await commonYtdlpArgs()),
       '--skip-download',
       '--write-subs',
+      '--write-auto-subs', // fall back to auto-generated captions when there's no manual track
       '--sub-langs',
       lang,
       '--convert-subs',

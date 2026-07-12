@@ -17,6 +17,7 @@ export interface VideoData {
   extractor?: string
   webpage_url?: string
   subtitleLangs?: string[]
+  autoSubLangs?: string[]
   formats?: FormatData[]
 }
 

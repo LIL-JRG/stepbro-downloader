@@ -22,8 +22,16 @@ interface ResultPanelProps {
 
 export function ResultPanel({ token, filename, video, onReset }: ResultPanelProps) {
   const { m } = useI18n()
-  const langs = video.subtitleLangs ?? []
   const url = video.webpage_url ?? ''
+
+  // Manual subs first, then curated auto-caption languages (labelled "auto").
+  const manual = video.subtitleLangs ?? []
+  const auto = (video.autoSubLangs ?? []).filter((l) => !manual.includes(l))
+  const subOptions = [
+    ...manual.map((l) => ({ value: l, label: l })),
+    ...auto.map((l) => ({ value: l, label: `${l} · ${m.result.auto}` })),
+  ]
+  const langs = subOptions.map((o) => o.value)
 
   const [lang, setLang] = useState(langs[0] ?? '')
   const [srt, setSrt] = useState<string | null>(null)
@@ -98,11 +106,11 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
               }}
             >
               <SelectTrigger className="h-8 rounded-full px-3 text-xs">
-                <SelectValue>{lang}</SelectValue>
+                <SelectValue>{subOptions.find((o) => o.value === lang)?.label ?? lang}</SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-64">
-                {langs.map((l) => (
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
+                {subOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
