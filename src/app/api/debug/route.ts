@@ -57,15 +57,39 @@ export async function GET(request: NextRequest) {
   //                          (avoids watch-page bot check, goes direct to android API)
   //  formatsIosNoPage      — ios with player_skip=webpage
   //                          (same, but ios for HLS streams)
+  //  formatsBgutil         — web client with the bgutil PO token + visitor_data
+  //                          and player_skip=webpage,configs. This is the datacenter
+  //                          strategy; the four tests above never exercise it because
+  //                          cookies take priority in commonYtdlpArgs(). Tested here
+  //                          in isolation (no cookies) so we can see whether bgutil
+  //                          alone bypasses the bot check even while cookies are set.
   let formatsCurrentConfig: string | null = null
   let formatsWebCookiesOnly: string | null = null
   let formatsAndroidNoPage: string | null = null
   let formatsIosNoPage: string | null = null
+  let formatsBgutil: string | null = null
 
   if (testUrl) {
-    const cookiesArgs = cookiesFile ? ['--cookies', cookiesFile] : []
+    // Build the exact bgutil branch args from the tokens fetched above.
+    const tok = (bgutilWebTokens && typeof bgutilWebTokens === 'object')
+      ? bgutilWebTokens as Record<string, string>
+      : null
+    const poToken = tok?.poToken ?? tok?.po_token
+    const visitorData = decodeURIComponent(
+      tok?.contentBinding ?? tok?.visitorData ?? tok?.visitor_data ?? ''
+    )
+    const bgutilPromise = (poToken && visitorData)
+      ? runCommand(bin, [
+          '--js-runtimes', `node:${process.execPath}`,
+          '--remote-components', 'ejs:github',
+          '--extractor-args',
+          `youtube:player_client=web;po_token=web+${poToken};visitor_data=${visitorData};player_skip=webpage,configs`,
+          '--extractor-args', 'youtubetab:skip=webpage',
+          '--list-formats', '--no-playlist', testUrl,
+        ])
+      : Promise.resolve('bgutil not configured or returned no tokens')
 
-    const [a, b, c, d] = await Promise.all([
+    const [a, b, c, d, e] = await Promise.all([
       runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
       cookiesFile
         ? runCommand(bin, [
@@ -84,12 +108,14 @@ export async function GET(request: NextRequest) {
         '--extractor-args', 'youtube:player_client=ios;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
+      bgutilPromise,
     ])
 
     formatsCurrentConfig  = a
     formatsWebCookiesOnly = b
     formatsAndroidNoPage  = c
     formatsIosNoPage      = d
+    formatsBgutil         = e
   }
 
   return Response.json({
@@ -105,5 +131,6 @@ export async function GET(request: NextRequest) {
     formatsWebCookiesOnly: formatsWebCookiesOnly ?? 'Pass ?url=<youtube_url> to compare',
     formatsAndroidNoPage:  formatsAndroidNoPage  ?? 'Pass ?url=<youtube_url> to compare',
     formatsIosNoPage:      formatsIosNoPage       ?? 'Pass ?url=<youtube_url> to compare',
+    formatsBgutil:         formatsBgutil          ?? 'Pass ?url=<youtube_url> to compare',
   })
 }
