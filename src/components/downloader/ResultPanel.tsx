@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Download, Image as ImageIcon, FileText, Copy, Check, Eye, RotateCcw } from 'lucide-react'
 import { useI18n } from '@/i18n/provider'
+import { playCue } from '@/lib/sound'
 import type { VideoData } from './VideoInfo'
 
 interface ResultPanelProps {
@@ -37,12 +38,10 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
   const [srt, setSrt] = useState<string | null>(null)
   const [loadingSub, setLoadingSub] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [thumbFmt, setThumbFmt] = useState<'jpg' | 'webp' | 'png'>('jpg')
   const [showThumb, setShowThumb] = useState(false)
 
-  const thumbSrc = video.thumbnail
-    ? `/api/thumbnail?url=${encodeURIComponent(video.thumbnail)}&format=${thumbFmt}`
-    : ''
+  // Always JPG for maximum compatibility.
+  const thumbSrc = video.thumbnail ? `/api/thumbnail?url=${encodeURIComponent(video.thumbnail)}` : ''
 
   async function toggleView() {
     if (srt !== null) { setSrt(null); return }
@@ -63,6 +62,7 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
     try {
       await navigator.clipboard.writeText(srt)
       setCopied(true)
+      playCue('tick')
       setTimeout(() => setCopied(false), 1500)
     } catch {
       /* clipboard blocked */
@@ -81,43 +81,35 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
         </button>
       </div>
 
-      {/* Primary action — save the media file */}
+      {/* Primary actions — save the media, toggle the thumbnail preview */}
       <div className="flex flex-wrap gap-2">
         <a href={`/api/download/${token}`} download={filename}>
           <Button className="h-9 gap-1.5 rounded-full px-4">
             <Download className="size-4" /> {m.result.saveFile}
           </Button>
         </a>
+        {video.thumbnail && (
+          <Button
+            variant="outline"
+            className="h-9 gap-1.5 rounded-full px-4"
+            onClick={() => setShowThumb((v) => !v)}
+            aria-pressed={showThumb}
+          >
+            <ImageIcon className="size-4" /> {m.result.thumbnail}
+          </Button>
+        )}
       </div>
 
-      {/* Thumbnail — preview then download in the chosen format */}
-      {video.thumbnail && (
-        <div className="space-y-2 border-t border-border pt-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">{m.result.thumbnail}</span>
-            <Select value={thumbFmt} onValueChange={(v) => v && setThumbFmt(v as 'jpg' | 'webp' | 'png')}>
-              <SelectTrigger className="h-8 rounded-full px-3 text-xs">
-                <SelectValue>{thumbFmt.toUpperCase()}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="jpg">JPG</SelectItem>
-                <SelectItem value="webp">WebP</SelectItem>
-                <SelectItem value="png">PNG</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-full" onClick={() => setShowThumb((v) => !v)}>
-              <Eye className="size-3.5" /> {showThumb ? m.result.hide : m.result.view}
+      {/* Thumbnail preview + download, only while toggled on */}
+      {video.thumbnail && showThumb && (
+        <div className="space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumbSrc} alt="thumbnail" className="max-h-56 w-auto rounded-xl" />
+          <a href={`${thumbSrc}&download=1`} download>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-full">
+              <Download className="size-3.5" /> {m.result.download}
             </Button>
-            <a href={`${thumbSrc}&download=1`} download>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-full">
-                <ImageIcon className="size-3.5" /> {m.result.download}
-              </Button>
-            </a>
-          </div>
-          {showThumb && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbSrc} alt="thumbnail" className="max-h-56 w-auto rounded-xl" />
-          )}
+          </a>
         </div>
       )}
 

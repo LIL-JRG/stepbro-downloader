@@ -14,6 +14,7 @@ import { ResultPanel } from '@/components/downloader/ResultPanel'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
 import { useI18n } from '@/i18n/provider'
+import { initSound, playCue } from '@/lib/sound'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide-react'
 
 // Where the Donate button points — change to your own sponsor/donation page.
@@ -36,6 +37,11 @@ export default function Home() {
   const [progress, setProgress] = useState<{ percent: number; speed?: string; eta?: string } | null>(null)
   const [result, setResult] = useState<{ token: string; filename: string } | null>(null)
   const downloadAbort = useRef<AbortController | null>(null)
+
+  // Load interaction sounds (cuelume) once on the client.
+  useEffect(() => {
+    initSound()
+  }, [])
 
   // Fetch the current daily download allowance (server is the source of truth).
   useEffect(() => {
@@ -139,6 +145,7 @@ export default function Home() {
     setIsDownloading(true)
     setResult(null)
     setProgress({ percent: 0 })
+    playCue('press')
     const controller = new AbortController()
     downloadAbort.current = controller
 
@@ -189,11 +196,13 @@ export default function Home() {
                 setUsage({ limit: event.limit, remaining: event.remaining })
               }
               toast.success(m.result.ready)
+              playCue('success')
               setProgress(null)
               downloadAbort.current = null
               setIsDownloading(false)
             } else if (event.type === 'failed') {
               toast.error(event.message ?? m.toast.failed)
+              playCue('droplet')
               setProgress(null)
               downloadAbort.current = null
               setIsDownloading(false)

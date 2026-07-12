@@ -5,6 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { playCue } from "@/lib/sound";
 
 type ViewTransitionDocument = Document & {
   startViewTransition?: (callback: () => void) => unknown;
@@ -14,6 +15,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
 
   function toggleTheme() {
+    playCue("toggle");
     const next = resolvedTheme === "dark" ? "light" : "dark";
     const doc = document as ViewTransitionDocument;
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
