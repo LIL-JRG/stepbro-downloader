@@ -10,7 +10,11 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
 import { InfoSections } from '@/components/InfoSections'
-import { ExternalLink, Loader2, Download, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
+import { LanguageSelector } from '@/components/language-selector'
+import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide-react'
+
+// Where the Donate button points — change to your own sponsor/donation page.
+const DONATE_URL = 'https://github.com/sponsors/LIL-JRG'
 
 function looksLikeUrl(s: string): boolean {
   return /^https?:\/\/\S+\.\S+/i.test(s.trim())
@@ -130,26 +134,18 @@ export default function Home() {
 
   return (
     <div className="flex min-h-svh flex-col bg-page">
-      <header className="flex items-center justify-between px-4 py-3.5 sm:px-6">
+      <header className="flex items-center justify-between gap-2 px-4 py-3.5 sm:px-6">
+        <span className="font-display text-lg font-bold tracking-tight text-white">
+          stepbro downloader
+        </span>
         <div className="flex items-center gap-2 text-white">
-          <span className="grid size-8 place-items-center rounded-xl bg-white/20">
-            <Download className="size-4" />
-          </span>
-          <span className="font-display text-lg font-bold tracking-tight">
-            stepbro downloader
-          </span>
-        </div>
-        <div className="flex items-center gap-1 text-white">
-          <a
-            href="https://github.com/LIL-JRG/stepbro-downloader"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="stepbro downloader on GitHub"
-          >
-            <Button variant="ghost" size="icon" className="size-8 text-white hover:bg-white/20 hover:text-white">
-              <ExternalLink className="size-4" />
+          <a href={DONATE_URL} target="_blank" rel="noopener noreferrer">
+            <Button className="h-8 gap-1.5 rounded-full bg-amber-400 px-3.5 font-semibold text-amber-950 hover:bg-amber-300">
+              <Heart className="size-3.5" />
+              <span className="hidden sm:inline">Donate</span>
             </Button>
           </a>
+          <LanguageSelector />
           <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
         </div>
       </header>
