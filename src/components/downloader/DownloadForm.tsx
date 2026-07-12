@@ -20,10 +20,6 @@ export interface DownloadConfig {
   audioOnly: boolean
   audioFormat?: string
   audioQuality?: string
-  playlist?: boolean
-  embedThumbnail?: boolean
-  embedSubs?: boolean
-  srtSubs?: boolean
 }
 
 interface DownloadFormProps {
@@ -75,10 +71,6 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
   const [container, setContainer] = useState('mp4')
   const [audioBitrate, setAudioBitrate] = useState('best')
   const [audioFormat, setAudioFormat] = useState('mp3')
-  const [playlist, setPlaylist] = useState(false)
-  const [embedThumbnail, setEmbedThumbnail] = useState(false)
-  const [embedSubs, setEmbedSubs] = useState(false)
-  const [srtSubs, setSrtSubs] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
   // Restore the last-used choices (deferred so it doesn't fire as a synchronous
@@ -96,10 +88,6 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
         if (CONTAINER.some((o) => o.value === stored!.container)) setContainer(stored.container as string)
         if (AUDIO_BITRATE.some((o) => o.value === stored!.audioBitrate)) setAudioBitrate(stored.audioBitrate as string)
         if (AUDIO_FORMAT.some((o) => o.value === stored!.audioFormat)) setAudioFormat(stored.audioFormat as string)
-        if (typeof stored.playlist === 'boolean') setPlaylist(stored.playlist)
-        if (typeof stored.embedThumbnail === 'boolean') setEmbedThumbnail(stored.embedThumbnail)
-        if (typeof stored.embedSubs === 'boolean') setEmbedSubs(stored.embedSubs)
-        if (typeof stored.srtSubs === 'boolean') setSrtSubs(stored.srtSubs)
       }
       setHydrated(true)
     })
@@ -108,22 +96,9 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
   // Persist choices once restored (localStorage write is external sync, not setState).
   useEffect(() => {
     if (!hydrated) return
-    localStorage.setItem(
-      PREFS_KEY,
-      JSON.stringify({
-        version: 1,
-        mode,
-        videoQuality,
-        container,
-        audioBitrate,
-        audioFormat,
-        playlist,
-        embedThumbnail,
-        embedSubs,
-        srtSubs,
-      })
-    )
-  }, [hydrated, mode, videoQuality, container, audioBitrate, audioFormat, playlist, embedThumbnail, embedSubs, srtSubs])
+    const prefs = { version: 1, mode, videoQuality, container, audioBitrate, audioFormat }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  }, [hydrated, mode, videoQuality, container, audioBitrate, audioFormat])
 
   const disabled = isDownloading || !targetUrl || !!blocked
 
@@ -142,22 +117,8 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
     return o.value === 'best' ? m.form.best : o.label
   }
 
-  // Subtitles only make sense for video; thumbnail + playlist apply to both.
-  const chips = [
-    { key: 'playlist', label: m.options.playlist, active: playlist, toggle: () => setPlaylist((v) => !v), show: true },
-    { key: 'thumb', label: m.options.thumbnail, active: embedThumbnail, toggle: () => setEmbedThumbnail((v) => !v), show: true },
-    { key: 'subs', label: m.options.subsEmbed, active: embedSubs, toggle: () => setEmbedSubs((v) => !v), show: mode === 'mp4' },
-    { key: 'srt', label: m.options.subsSrt, active: srtSubs, toggle: () => setSrtSubs((v) => !v), show: mode === 'mp4' },
-  ].filter((c) => c.show)
-
   function handleSubmit() {
     if (disabled) return
-    const extras = {
-      playlist,
-      embedThumbnail,
-      embedSubs: mode === 'mp4' ? embedSubs : false,
-      srtSubs: mode === 'mp4' ? srtSubs : false,
-    }
     if (mode === 'mp3') {
       onDownload({
         url: targetUrl,
@@ -166,91 +127,68 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
         audioOnly: true,
         audioFormat,
         audioQuality: audioBitrate !== 'best' ? audioBitrate : undefined,
-        ...extras,
       })
     } else {
-      onDownload({ url: targetUrl, quality: videoQuality, container, audioOnly: false, ...extras })
+      onDownload({ url: targetUrl, quality: videoQuality, container, audioOnly: false })
     }
   }
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* MP3 / MP4 segmented toggle */}
-        <div className="flex shrink-0 rounded-full bg-muted p-1">
-          {(['mp3', 'mp4'] as const).map((md) => (
-            <button
-              key={md}
-              onClick={() => setMode(md)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all',
-                mode === md
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {md === 'mp3' ? <Music className="size-3.5" /> : <Video className="size-3.5" />}
-              {md.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        {/* Quality */}
-        <Select value={primaryValue} onValueChange={(v) => v && setPrimary(v)}>
-          <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-28">
-            <SelectValue>{qualityLabel(primaryValue)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {primary.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.value === 'best' ? m.form.best : o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Format / container */}
-        <Select value={secondaryValue} onValueChange={(v) => v && setSecondary(v)}>
-          <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-24">
-            <SelectValue>{secondary.find((o) => o.value === secondaryValue)?.label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {secondary.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Download */}
-        <Button
-          onClick={handleSubmit}
-          disabled={disabled}
-          className="h-10 shrink-0 gap-2 rounded-full px-6 font-semibold"
-        >
-          {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {isDownloading ? m.form.downloading : m.form.download}
-        </Button>
-      </div>
-
-      {/* Optional extras */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {chips.map((c) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* MP3 / MP4 segmented toggle */}
+      <div className="flex shrink-0 rounded-full bg-muted p-1">
+        {(['mp3', 'mp4'] as const).map((md) => (
           <button
-            key={c.key}
-            type="button"
-            onClick={c.toggle}
-            aria-pressed={c.active}
+            key={md}
+            onClick={() => setMode(md)}
             className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-              c.active
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-muted/60 text-muted-foreground hover:text-foreground'
+              'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all',
+              mode === md
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {c.label}
+            {md === 'mp3' ? <Music className="size-3.5" /> : <Video className="size-3.5" />}
+            {md.toUpperCase()}
           </button>
         ))}
       </div>
+
+      {/* Quality */}
+      <Select value={primaryValue} onValueChange={(v) => v && setPrimary(v)}>
+        <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-28">
+          <SelectValue>{qualityLabel(primaryValue)}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {primary.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.value === 'best' ? m.form.best : o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Format / container */}
+      <Select value={secondaryValue} onValueChange={(v) => v && setSecondary(v)}>
+        <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-24">
+          <SelectValue>{secondary.find((o) => o.value === secondaryValue)?.label}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {secondary.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Download */}
+      <Button
+        onClick={handleSubmit}
+        disabled={disabled}
+        className="h-10 shrink-0 gap-2 rounded-full px-6 font-semibold"
+      >
+        {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+        {isDownloading ? m.form.downloading : m.form.download}
+      </Button>
     </div>
   )
 }

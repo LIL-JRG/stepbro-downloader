@@ -27,11 +27,18 @@ export const en = {
   progress: {
     processing: 'Processing…',
   },
-  options: {
-    playlist: 'Playlist',
+  result: {
+    ready: 'Your download is ready',
+    saveFile: 'Save file',
     thumbnail: 'Thumbnail',
-    subsEmbed: 'Embed subtitles',
-    subsSrt: 'Subtitles (.srt)',
+    subtitles: 'Subtitles',
+    view: 'View',
+    hide: 'Hide',
+    copy: 'Copy',
+    copied: 'Copied',
+    downloadSrt: 'Download .srt',
+    none: 'No subtitles available',
+    another: 'Download another',
   },
   preview: {
     loading: 'Loading preview…',

@@ -23,11 +23,18 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       tooLong: 'Video demasiado largo (máx {hours}h)',
     },
     progress: { processing: 'Procesando…' },
-    options: {
-      playlist: 'Lista',
+    result: {
+      ready: 'Tu descarga está lista',
+      saveFile: 'Guardar archivo',
       thumbnail: 'Miniatura',
-      subsEmbed: 'Incrustar subtítulos',
-      subsSrt: 'Subtítulos (.srt)',
+      subtitles: 'Subtítulos',
+      view: 'Ver',
+      hide: 'Ocultar',
+      copy: 'Copiar',
+      copied: 'Copiado',
+      downloadSrt: 'Descargar .srt',
+      none: 'No hay subtítulos disponibles',
+      another: 'Descargar otro',
     },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {

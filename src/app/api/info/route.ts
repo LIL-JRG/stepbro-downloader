@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
           description: info.description,
           webpage_url: info.webpage_url,
           extractor: info.extractor,
+          subtitleLangs: Object.keys(info.subtitles ?? {}).filter((l: string) => l !== 'live_chat'),
           formats: (info.formats || []).map((f: RawFormat) => ({
             format_id: f.format_id,
             format_note: f.format_note,

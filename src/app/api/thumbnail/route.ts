@@ -53,10 +53,14 @@ export async function GET(request: NextRequest) {
   if (!res) return new Response('Thumbnail unavailable', { status: 502 })
 
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
-  return new Response(res.body, {
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
-    },
-  })
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+    'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+  }
+  // ?download=1 → force a file download instead of inline display.
+  if (request.nextUrl.searchParams.get('download')) {
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    headers['Content-Disposition'] = `attachment; filename="thumbnail.${ext}"`
+  }
+  return new Response(res.body, { headers })
 }

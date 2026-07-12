@@ -16,6 +16,7 @@ export interface VideoData {
   view_count?: number
   extractor?: string
   webpage_url?: string
+  subtitleLangs?: string[]
   formats?: FormatData[]
 }
 

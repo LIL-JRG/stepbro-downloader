@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
+import { ResultPanel } from '@/components/downloader/ResultPanel'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
 import { useI18n } from '@/i18n/provider'
@@ -33,6 +34,7 @@ export default function Home() {
   const [usage, setUsage] = useState<{ limit: number; remaining: number } | null>(null)
   const [maxDuration, setMaxDuration] = useState(0)
   const [progress, setProgress] = useState<{ percent: number; speed?: string; eta?: string } | null>(null)
+  const [result, setResult] = useState<{ token: string; filename: string } | null>(null)
   const downloadAbort = useRef<AbortController | null>(null)
 
   // Fetch the current daily download allowance (server is the source of truth).
@@ -135,6 +137,7 @@ export default function Home() {
       return
     }
     setIsDownloading(true)
+    setResult(null)
     setProgress({ percent: 0 })
     const controller = new AbortController()
     downloadAbort.current = controller
@@ -179,16 +182,13 @@ export default function Home() {
             if (event.type === 'progress' && typeof event.percent === 'number') {
               setProgress({ percent: event.percent, speed: event.speed, eta: event.eta })
             } else if (event.type === 'ready' && event.token) {
-              const a = document.createElement('a')
-              a.href = `/api/download/${event.token}`
-              a.download = event.filename ?? 'download'
-              document.body.appendChild(a)
-              a.click()
-              document.body.removeChild(a)
+              // Show the result panel with save/thumbnail/subtitle actions
+              // (no auto-download — the user picks what to save).
+              setResult({ token: event.token, filename: event.filename ?? 'download' })
               if (typeof event.remaining === 'number' && typeof event.limit === 'number') {
                 setUsage({ limit: event.limit, remaining: event.remaining })
               }
-              toast.success(m.toast.started)
+              toast.success(m.result.ready)
               setProgress(null)
               downloadAbort.current = null
               setIsDownloading(false)
@@ -252,7 +252,10 @@ export default function Home() {
               <Input
                 placeholder={m.hero.placeholder}
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                  setUrl(e.target.value)
+                  setResult(null)
+                }}
                 className="h-12 rounded-full border-transparent bg-muted pr-12 pl-5 text-base shadow-inner focus-visible:bg-background"
                 autoFocus
               />
@@ -379,6 +382,26 @@ export default function Home() {
                 <VideoInfo data={videoData} />
               </motion.div>
             ) : null}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {result && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4"
+              >
+                <ResultPanel
+                  token={result.token}
+                  filename={result.filename}
+                  video={videoData ?? { id: '', title: result.filename }}
+                  onReset={() => setResult(null)}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
