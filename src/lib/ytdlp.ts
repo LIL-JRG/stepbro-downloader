@@ -44,7 +44,12 @@ export async function commonYtdlpArgs(): Promise<string[]> {
   const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
   const bgutilUrl   = process.env.BGUTIL_URL?.replace(/\/$/, '')
 
-  args.push('--js-runtimes', 'node:/usr/local/bin/node')
+  // Resolve the JS runtime to the Node binary actually running this process.
+  // Hardcoding /usr/local/bin/node only works inside the Alpine container; on a
+  // Windows/macOS dev machine that path does not exist and the n-challenge solver
+  // (needed to avoid throttled downloads) would silently fail. process.execPath is
+  // the absolute path to the current Node executable on every platform.
+  args.push('--js-runtimes', `node:${process.execPath}`)
   args.push('--remote-components', 'ejs:github')
 
   if (cookiesFile) {
@@ -86,7 +91,16 @@ export async function commonYtdlpArgs(): Promise<string[]> {
     }
     args.push('--extractor-args', 'youtubetab:skip=webpage')
   } else {
-    args.push('--extractor-args', 'youtube:player_client=ios,android')
+    // No cookies, no bgutil: let yt-dlp use its default (web) client.
+    //
+    // On a residential IP (local dev, or a home-server deploy) the default web
+    // client is NOT bot-blocked and returns the full adaptive format list (up to
+    // 4K). Forcing player_client=ios,android here is actively harmful — YouTube
+    // now caps those clients (without a PO token) to format 18 only, i.e. 360p.
+    //
+    // On a datacenter IP the web client would be blocked, so this branch is only a
+    // last resort: production is expected to configure bgutil (or cookies) above.
+    // We push no player_client and rely on yt-dlp's default.
   }
 
   return args
