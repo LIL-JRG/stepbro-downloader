@@ -43,6 +43,17 @@ export async function commonYtdlpArgs(): Promise<string[]> {
 
   const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
   const bgutilUrl   = process.env.BGUTIL_URL?.replace(/\/$/, '')
+  const proxy       = process.env.YTDLP_PROXY
+
+  // Route ALL outbound yt-dlp traffic through a forward proxy when configured.
+  // On a heavily flagged datacenter IP, YouTube returns "Sign in to confirm you're
+  // not a bot" for every client — even with valid cookies or a bgutil PO token —
+  // because the block is IP-based. Sending requests through a residential/mobile
+  // proxy (or a self-hosted proxy on a residential connection) is the only reliable
+  // fix. Accepts any yt-dlp --proxy URL, e.g. http://user:pass@host:port or
+  // socks5://host:port. Applied first so it covers the cookies, bgutil and default
+  // branches alike.
+  if (proxy) args.push('--proxy', proxy)
 
   // Resolve the JS runtime to the Node binary actually running this process.
   // Hardcoding /usr/local/bin/node only works inside the Alpine container; on a

@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
 
   const bgutilUrl  = process.env.BGUTIL_URL?.replace(/\/$/, '')
   const cookiesFile = process.env.YOUTUBE_COOKIES_FILE ?? null
+  const proxy = process.env.YTDLP_PROXY ?? null
+  // Prepended to every format test so the comparisons reflect the proxy too.
+  const proxyArgs = proxy ? ['--proxy', proxy] : []
 
   // Test bgutil token endpoint
   let bgutilWebStatus = 'not configured'
@@ -80,6 +83,7 @@ export async function GET(request: NextRequest) {
     )
     const bgutilPromise = (poToken && visitorData)
       ? runCommand(bin, [
+          ...proxyArgs,
           '--js-runtimes', `node:${process.execPath}`,
           '--remote-components', 'ejs:github',
           '--extractor-args',
@@ -93,6 +97,7 @@ export async function GET(request: NextRequest) {
       runCommand(bin, [...sharedArgs, '--list-formats', '--no-playlist', testUrl]),
       cookiesFile
         ? runCommand(bin, [
+            ...proxyArgs,
             '--cookies', cookiesFile,
             '--extractor-args', 'youtube:player_client=web',
             '--list-formats', '--no-playlist', testUrl,
@@ -101,10 +106,12 @@ export async function GET(request: NextRequest) {
       // android and ios are skipped by yt-dlp when --cookies is set,
       // so these must always run without cookies.
       runCommand(bin, [
+        ...proxyArgs,
         '--extractor-args', 'youtube:player_client=android;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
       runCommand(bin, [
+        ...proxyArgs,
         '--extractor-args', 'youtube:player_client=ios;player_skip=webpage',
         '--list-formats', '--no-playlist', testUrl,
       ]),
@@ -122,6 +129,7 @@ export async function GET(request: NextRequest) {
     ytdlpBin: bin,
     ytdlpVersion,
     cookiesFile,
+    proxy,
     bgutilUrl: bgutilUrl ?? null,
     bgutilWebStatus,
     bgutilWebTokens,
