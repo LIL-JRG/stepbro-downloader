@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Eye, Clock, Calendar, User } from 'lucide-react'
+import { useI18n } from '@/i18n/provider'
 
 export interface VideoData {
   id: string
@@ -44,6 +45,7 @@ function formatDate(d?: string): string {
 }
 
 export function VideoInfo({ data }: { data: VideoData }) {
+  const { m } = useI18n()
   return (
     <div className="rounded-2xl bg-card p-4 shadow-lg shadow-black/5 ring-1 ring-black/5 dark:ring-white/10 space-y-3">
       <div className="flex gap-3">
@@ -72,7 +74,7 @@ export function VideoInfo({ data }: { data: VideoData }) {
             )}
             {data.formats && (
               <Badge variant="outline" className="text-[10px] font-medium h-4 px-1.5">
-                {data.formats.length} formats
+                {data.formats.length} {m.video.formats}
               </Badge>
             )}
           </div>

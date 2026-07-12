@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Video, Music, Download, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n/provider'
 
 export interface DownloadConfig {
   url: string
@@ -64,6 +65,7 @@ const AUDIO_FORMAT = [
 ]
 
 export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: DownloadFormProps) {
+  const { m } = useI18n()
   const [mode, setMode] = useState<'mp4' | 'mp3'>('mp4')
   const [videoQuality, setVideoQuality] = useState('best')
   const [container, setContainer] = useState('mp4')
@@ -108,6 +110,13 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
   const secondaryValue = mode === 'mp4' ? container : audioFormat
   const setSecondary = mode === 'mp4' ? setContainer : setAudioFormat
 
+  // Only "Best" is localised; resolutions and codecs are universal.
+  const qualityLabel = (value: string) => {
+    const o = primary.find((x) => x.value === value)
+    if (!o) return ''
+    return o.value === 'best' ? m.form.best : o.label
+  }
+
   function handleSubmit() {
     if (disabled) return
     if (mode === 'mp3') {
@@ -128,19 +137,19 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
     <div className="flex flex-wrap items-center gap-2">
       {/* MP3 / MP4 segmented toggle */}
       <div className="flex shrink-0 rounded-full bg-muted p-1">
-        {(['mp3', 'mp4'] as const).map((m) => (
+        {(['mp3', 'mp4'] as const).map((md) => (
           <button
-            key={m}
-            onClick={() => setMode(m)}
+            key={md}
+            onClick={() => setMode(md)}
             className={cn(
               'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-all',
-              mode === m
+              mode === md
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            {m === 'mp3' ? <Music className="size-3.5" /> : <Video className="size-3.5" />}
-            {m.toUpperCase()}
+            {md === 'mp3' ? <Music className="size-3.5" /> : <Video className="size-3.5" />}
+            {md.toUpperCase()}
           </button>
         ))}
       </div>
@@ -148,11 +157,13 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
       {/* Quality */}
       <Select value={primaryValue} onValueChange={(v) => v && setPrimary(v)}>
         <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-28">
-          <SelectValue>{primary.find((o) => o.value === primaryValue)?.label}</SelectValue>
+          <SelectValue>{qualityLabel(primaryValue)}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {primary.map((o) => (
-            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            <SelectItem key={o.value} value={o.value}>
+              {o.value === 'best' ? m.form.best : o.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -176,7 +187,7 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
         className="h-10 shrink-0 gap-2 rounded-full px-6 font-semibold"
       >
         {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-        {isDownloading ? 'Downloading…' : 'Download'}
+        {isDownloading ? m.form.downloading : m.form.download}
       </Button>
     </div>
   )

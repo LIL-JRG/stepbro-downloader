@@ -11,6 +11,7 @@ import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
+import { useI18n } from '@/i18n/provider'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide-react'
 
 // Where the Donate button points — change to your own sponsor/donation page.
@@ -22,6 +23,7 @@ function looksLikeUrl(s: string): boolean {
 }
 
 export default function Home() {
+  const { m } = useI18n()
   const [url, setUrl] = useState('')
   const [videoData, setVideoData] = useState<VideoData | null>(null)
   const [isFetching, setIsFetching] = useState(false)
@@ -101,22 +103,22 @@ export default function Home() {
       const text = await navigator.clipboard.readText()
       if (text) setUrl(text.trim())
     } catch {
-      toast.error('Clipboard access is blocked by the browser')
+      toast.error(m.toast.clipboard)
     }
   }
 
   function handleDownload(config: DownloadConfig) {
     if (isDownloading) return
     if (!agreed) {
-      toast.error('Please accept the copyright terms first')
+      toast.error(m.toast.needConsent)
       return
     }
     if (!config.url) {
-      toast.error('Paste a video URL first')
+      toast.error(m.toast.needUrl)
       return
     }
     if (usage && usage.remaining <= 0) {
-      toast.error('Daily download limit reached. Please try again tomorrow.')
+      toast.error(m.toast.limit)
       return
     }
     setIsDownloading(true)
@@ -131,7 +133,7 @@ export default function Home() {
         if (res.status === 429 && typeof data.limit === 'number') {
           setUsage({ limit: data.limit, remaining: data.remaining ?? 0 })
         }
-        throw new Error(data.error || 'Download failed')
+        throw new Error(data.error || m.toast.failed)
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -164,10 +166,10 @@ export default function Home() {
               if (typeof event.remaining === 'number' && typeof event.limit === 'number') {
                 setUsage({ limit: event.limit, remaining: event.remaining })
               }
-              toast.success('Download started')
+              toast.success(m.toast.started)
               setIsDownloading(false)
             } else if (event.type === 'failed') {
-              toast.error(event.message ?? 'Download failed')
+              toast.error(event.message ?? m.toast.failed)
               setIsDownloading(false)
             }
           } catch { /* ignore parse errors */ }
@@ -190,7 +192,7 @@ export default function Home() {
             <a href={DONATE_URL} target="_blank" rel="noopener noreferrer">
               <Button className="h-8 gap-1.5 rounded-full bg-amber-400 px-3.5 font-semibold text-amber-950 hover:bg-amber-300">
                 <Heart className="size-3.5" />
-                <span className="hidden sm:inline">Donate</span>
+                <span className="hidden sm:inline">{m.nav.donate}</span>
               </Button>
             </a>
             <LanguageSelector />
@@ -205,17 +207,17 @@ export default function Home() {
           <div className="rounded-3xl bg-card p-5 shadow-2xl shadow-black/20 ring-1 ring-black/5 dark:ring-white/10 sm:p-7">
             <div className="mb-5 space-y-1.5 text-center">
               <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground sm:text-3xl">
-                Download any video
+                {m.hero.title}
               </h1>
               <p className="text-sm text-muted-foreground">
-                YouTube, TikTok, X, Instagram &amp; more — MP4 or MP3, up to 4K
+                {m.hero.subtitle}
               </p>
             </div>
 
             {/* URL input with a paste button */}
             <div className="relative">
               <Input
-                placeholder="Paste the video URL here…"
+                placeholder={m.hero.placeholder}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="h-12 rounded-full border-transparent bg-muted pr-12 pl-5 text-base shadow-inner focus-visible:bg-background"
@@ -224,7 +226,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={pasteFromClipboard}
-                aria-label="Paste from clipboard"
+                aria-label={m.hero.paste}
                 className="absolute top-1/2 right-1.5 grid size-9 -translate-y-1/2 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
               >
                 <Clipboard className="size-4" />
@@ -247,8 +249,10 @@ export default function Home() {
                   )}
                 >
                   {usage.remaining > 0
-                    ? `${usage.remaining} of ${usage.limit} downloads left today`
-                    : 'Daily limit reached — resets tomorrow'}
+                    ? m.usage.left
+                        .replace('{remaining}', String(usage.remaining))
+                        .replace('{limit}', String(usage.limit))
+                    : m.usage.reached}
                 </p>
               )}
             </div>
@@ -259,7 +263,7 @@ export default function Home() {
                 type="button"
                 onClick={toggleAgreed}
                 aria-pressed={agreed}
-                aria-label="I agree"
+                aria-label={m.disclaimer.agree}
                 className={cn(
                   'mt-0.5 grid size-4 shrink-0 place-items-center rounded-[5px] border transition-colors',
                   agreed ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'
@@ -268,17 +272,13 @@ export default function Home() {
                 {agreed && <Check className="size-3" />}
               </button>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                I confirm I have read and agree to the{' '}
-                <a href="#" className="font-medium text-foreground underline-offset-2 hover:underline">
-                  copyright terms
-                </a>{' '}
-                and will not download copyrighted content.
+                {m.disclaimer.text}
               </p>
             </div>
 
             <p className="mt-2.5 text-center text-xs text-muted-foreground">
               <a href="#" className="inline-flex items-center gap-1 hover:text-foreground">
-                <Flag className="size-3" /> Report copyrighted content
+                <Flag className="size-3" /> {m.disclaimer.report}
               </a>
             </p>
           </div>
@@ -286,13 +286,13 @@ export default function Home() {
           {/* Feature pills */}
           <div className="mx-auto mt-4 flex flex-wrap items-center justify-center gap-2 text-sm">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 font-medium text-white backdrop-blur">
-              <Zap className="size-3.5" /> Fast &amp; free
+              <Zap className="size-3.5" /> {m.pills.fast}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3.5 py-1.5 font-semibold text-foreground shadow-lg">
-              <Film className="size-3.5" /> Up to 4K with audio
+              <Film className="size-3.5" /> {m.pills.quality}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 font-medium text-white backdrop-blur">
-              <Music className="size-3.5" /> MP3 audio
+              <Music className="size-3.5" /> {m.pills.mp3}
             </span>
           </div>
 
@@ -308,7 +308,7 @@ export default function Home() {
                 className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-card/80 py-5 text-sm text-muted-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 dark:ring-white/10"
               >
                 <Loader2 className="size-4 animate-spin" />
-                Loading preview…
+                {m.preview.loading}
               </motion.div>
             ) : videoData ? (
               <motion.div

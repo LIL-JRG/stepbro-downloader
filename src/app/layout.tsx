@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Geist_Mono, Fredoka } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { I18nProvider } from "@/i18n/provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -22,8 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
-          {children}
-          <Toaster richColors position="bottom-right" />
+          <I18nProvider>
+            {children}
+            <Toaster richColors position="bottom-right" />
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>
