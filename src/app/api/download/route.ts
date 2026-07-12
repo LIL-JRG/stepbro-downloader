@@ -31,13 +31,32 @@ function buildArgs(opts: DownloadOptions, outDir: string, shared: string[]): str
     const quality = opts.quality ?? 'best'
     const container = opts.container ?? 'any'
     const mergeFormat = container !== 'any' ? container : 'mp4'
-
-    // Audio MUST be compatible with the output container, or the merged file plays
-    // with no sound in most players. Pin AAC (m4a) for mp4/mkv and Opus for webm.
-    const audioExt = mergeFormat === 'webm' ? 'webm' : 'm4a'
     const heightFilter = quality === 'best' ? '' : `[height<=${quality}]`
+
+    // Both the video codec AND the audio codec must suit the container, or the
+    // merged file misbehaves in common players. VP9/AV1 inside MP4 plays as
+    // audio-only on Windows/QuickTime/Safari/iOS, and Opus inside MP4 has no
+    // sound — so MP4 pins H.264 (AVC) + AAC (universal; YouTube caps AVC at
+    // 1080p, use WebM/MKV for higher). WebM pins its native VP9/AV1 + Opus; MKV
+    // takes anything (VLC plays it) so it keeps the highest resolution.
+    let videoPref: string
+    let audioExt: string
+    if (mergeFormat === 'webm') {
+      videoPref = 'bv*[ext=webm]'
+      audioExt = 'webm'
+    } else if (mergeFormat === 'mkv') {
+      videoPref = 'bv*'
+      audioExt = 'm4a'
+    } else {
+      videoPref = 'bv*[vcodec^=avc1]'
+      audioExt = 'm4a'
+    }
+
     const combinedFallback = heightFilter ? `/b${heightFilter}/b` : '/b'
-    args.push('-f', `bv*${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`)
+    args.push(
+      '-f',
+      `${videoPref}${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`,
+    )
     args.push('-S', 'res,fps,vbr,abr,vcodec:avc,acodec:m4a')
     args.push('--merge-output-format', mergeFormat)
   }
