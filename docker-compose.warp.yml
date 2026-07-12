@@ -1,0 +1,49 @@
+# docker-compose.warp.yml — proxy de salida GRATIS con Cloudflare WARP
+#
+# Cuando la IP del VPS está bloqueada por YouTube ("Sign in to confirm you're not
+# a bot"), este servicio enruta la salida de yt-dlp por la red de Cloudflare WARP,
+# que suele estar menos marcada que las IPs de datacenter. Es gratis y corre en el
+# propio VPS (no hace falta otra computadora).
+#
+# NOTA: WARP puede o no saltar el bloqueo — depende de si YouTube acepta la IP de
+# salida de Cloudflare en ese momento. Es el mejor intento gratuito; verifícalo con
+# /api/debug tras conectarlo.
+#
+# Despliegue en Dokploy (igual que bgutil):
+#   1. Crea un nuevo "Docker Compose" service en Dokploy, apunta a este repo.
+#   2. En "Compose path" pon: ./docker-compose.warp.yml
+#   3. Deploy. Espera ~30s a que WARP registre (revisa logs: "Success").
+#   4. En el Application service principal agrega la env var y haz Redeploy:
+#        YTDLP_PROXY=socks5://warp:1080
+#   5. Verifica en /api/debug?url=<youtube_url>: el campo "proxy" debe aparecer y
+#      formatsBgutil / formatsCurrentConfig deberían listar formatos (no el error de bot).
+
+services:
+  warp:
+    image: caomingjun/warp:latest
+    container_name: warp
+    restart: unless-stopped
+    # Expone un proxy (HTTP y SOCKS5) en el puerto 1080, alcanzable por el resto de
+    # servicios de la red como socks5://warp:1080. No se publica al exterior.
+    environment:
+      - WARP_SLEEP=2
+      # Opcional: clave WARP+ para más ancho de banda (no necesaria para el free tier)
+      # - WARP_LICENSE_KEY=
+    cap_add:
+      - MKNOD
+      - AUDIT_WRITE
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - warp-data:/var/lib/cloudflare-warp
+    networks:
+      - dokploy-network
+
+volumes:
+  warp-data:
+
+networks:
+  dokploy-network:
+    external: true
