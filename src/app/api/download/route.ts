@@ -29,17 +29,24 @@ async function buildArgs(opts: DownloadOptions, outDir: string): Promise<string[
   } else {
     const quality = opts.quality ?? 'best'
     const container = opts.container ?? 'any'
-
-    if (quality === 'best') {
-      args.push('-f', 'bv*+ba/b')
-    } else {
-      // bv*[height<=X]+ba: separate video-only + audio-only streams at the requested height.
-      // Do NOT use b[height<=X] first — it matches YouTube's combined streams which
-      // are capped at 720p regardless of the selected quality.
-      args.push('-f', `bv*[height<=${quality}]+ba/bv*+ba/b`)
-    }
-
     const mergeFormat = container !== 'any' ? container : 'mp4'
+
+    // Audio MUST be compatible with the output container, or the merged file plays
+    // with no sound in most players. YouTube's highest-bitrate audio is Opus (webm),
+    // which does NOT play inside an MP4 container (Windows, QuickTime, Safari, many
+    // browsers) — so pin AAC (m4a) for mp4/mkv and Opus for webm. YouTube always
+    // offers an m4a AAC track, so the ext filter reliably matches; the un-filtered
+    // fallbacks keep downloads working if it ever doesn't.
+    const audioExt = mergeFormat === 'webm' ? 'webm' : 'm4a'
+    const heightFilter = quality === 'best' ? '' : `[height<=${quality}]`
+
+    // Prefer separate video-only + audio streams — combined streams (the `b`
+    // fallback) are capped at 720p regardless of the selected quality.
+    const combinedFallback = heightFilter ? `/b${heightFilter}/b` : '/b'
+    args.push(
+      '-f',
+      `bv*${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`,
+    )
     // Sort by quality first (res → fps → bitrate), then prefer compatible codecs
     // as a tiebreaker. ext: is intentionally omitted — --merge-output-format
     // handles the output container so we don't penalise VP9/AV1 streams.
