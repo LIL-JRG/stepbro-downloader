@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
+import { InfoSections } from '@/components/InfoSections'
 import { ExternalLink, Loader2, Download, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
 
 function looksLikeUrl(s: string): boolean {
@@ -264,6 +265,8 @@ export default function Home() {
             ) : null}
           </AnimatePresence>
         </div>
+
+        <InfoSections />
       </main>
     </div>
   )
