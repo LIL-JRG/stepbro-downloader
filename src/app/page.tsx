@@ -1,52 +1,69 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { VideoInfo, type VideoData } from '@/components/downloader/VideoInfo'
 import { DownloadForm, type DownloadConfig } from '@/components/downloader/DownloadForm'
-import { Search, ExternalLink, Loader2 } from 'lucide-react'
+import { ExternalLink, Loader2, Download } from 'lucide-react'
+
+function looksLikeUrl(s: string): boolean {
+  return /^https?:\/\/\S+\.\S+/i.test(s.trim())
+}
 
 export default function Home() {
   const [url, setUrl] = useState('')
   const [videoData, setVideoData] = useState<VideoData | null>(null)
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const urlInputRef = useRef<HTMLInputElement>(null)
 
-  // Sync browser-restored input value (session restore doesn't fire onChange)
+  // Auto-fetch a preview once the URL looks valid — no explicit "Fetch" step.
+  // All state updates happen inside the deferred timer (never synchronously in the
+  // effect body) so a fresh keystroke cancels the previous request cleanly.
   useEffect(() => {
-    const el = urlInputRef.current
-    if (el?.value) setUrl(el.value)
-  }, [])
-
-  async function fetchInfo() {
-    const trimmed = url.trim() || urlInputRef.current?.value.trim() || ''
-    if (!trimmed) return
-    if (url !== trimmed) setUrl(trimmed)
-    setIsFetching(true)
-    setVideoData(null)
-    try {
-      const res = await fetch('/api/info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmed }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Unknown error')
-      setVideoData(data)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      setIsFetching(false)
+    const trimmed = url.trim()
+    const controller = new AbortController()
+    const timer = setTimeout(async () => {
+      if (!looksLikeUrl(trimmed)) {
+        setVideoData(null)
+        setIsFetching(false)
+        return
+      }
+      setIsFetching(true)
+      try {
+        const res = await fetch('/api/info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: trimmed }),
+          signal: controller.signal,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Could not load video')
+        setVideoData(data)
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') setVideoData(null)
+      } finally {
+        setIsFetching(false)
+      }
+    }, 500)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
     }
-  }
+  }, [url])
+
+  // Download uses the canonical webpage_url when we have a preview, else the raw input.
+  const targetUrl = videoData?.webpage_url ?? url.trim()
 
   function handleDownload(config: DownloadConfig) {
     if (isDownloading) return
+    if (!config.url) {
+      toast.error('Paste a video URL first')
+      return
+    }
     setIsDownloading(true)
 
     fetch('/api/download', {
@@ -78,7 +95,6 @@ export default function Home() {
               message?: string
             }
             if (event.type === 'ready' && event.token) {
-              // Trigger browser download directly — no file saved on server long-term
               const a = document.createElement('a')
               a.href = `/api/download/${event.token}`
               a.download = event.filename ?? 'download'
@@ -101,77 +117,88 @@ export default function Home() {
   }
 
   return (
-    <div className="h-svh overflow-hidden lg:p-2 w-full">
-      <div className="lg:border lg:rounded-xl overflow-hidden flex flex-col bg-background h-full w-full">
-
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-2.5 sm:px-6 md:px-8 shrink-0">
-          <h1 className="text-base sm:text-lg font-medium text-foreground tracking-[-0.45px]">
+    <div className="flex min-h-svh flex-col bg-page">
+      <header className="flex items-center justify-between px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-2 text-white">
+          <span className="grid size-8 place-items-center rounded-xl bg-white/15">
+            <Download className="size-4" />
+          </span>
+          <span className="font-display text-lg font-semibold tracking-tight">
             stepbro downloader
-          </h1>
-          <div className="flex items-center gap-1.5">
-            <a href="https://github.com/LIL-JRG/stepbro-downloader" target="_blank" rel="noopener noreferrer" aria-label="yt-dlp on GitHub">
-              <Button variant="ghost" size="icon" className="size-8">
-                <ExternalLink className="size-4" />
-              </Button>
-            </a>
-            <ThemeToggle />
-          </div>
-        </header>
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-white">
+          <a
+            href="https://github.com/LIL-JRG/stepbro-downloader"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="stepbro downloader on GitHub"
+          >
+            <Button variant="ghost" size="icon" className="size-8 text-white hover:bg-white/15 hover:text-white">
+              <ExternalLink className="size-4" />
+            </Button>
+          </a>
+          <ThemeToggle className="text-white hover:bg-white/15 hover:text-white" />
+        </div>
+      </header>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-4">
-
-            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Search className="size-4 text-muted-foreground" />
-                <h2 className="text-[15px] font-normal text-foreground tracking-[-0.45px]">
-                  Video URL
-                </h2>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  ref={urlInputRef}
-                  placeholder="YouTube, TikTok, Twitter/X, Instagram, and more…"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchInfo()}
-                  className="h-9"
-                />
-                <Button
-                  size="sm"
-                  onClick={fetchInfo}
-                  disabled={isFetching}
-                  className="gap-1.5 shrink-0"
-                >
-                  {isFetching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                  {isFetching ? 'Loading…' : 'Fetch'}
-                </Button>
-              </div>
+      <main className="flex-1 px-4 pb-16">
+        <div className="mx-auto w-full max-w-xl pt-10 sm:pt-16">
+          {/* Main converter card */}
+          <div className="rounded-3xl bg-card p-5 shadow-xl shadow-black/10 ring-1 ring-black/5 dark:ring-white/10 sm:p-7">
+            <div className="mb-5 space-y-1.5 text-center">
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-[26px]">
+                Download any video
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Paste a link from YouTube, TikTok, X, Instagram &amp; more
+              </p>
             </div>
 
-            <AnimatePresence mode="wait">
-              {videoData && (
-                <motion.div
-                  key={videoData.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-4"
-                >
-                  <VideoInfo data={videoData} />
-                  <DownloadForm
-                    videoData={videoData}
-                    onDownload={handleDownload}
-                    isDownloading={isDownloading}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Input
+              placeholder="Paste the video URL here…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="mb-3 h-12 rounded-full border-transparent bg-muted px-5 text-base focus-visible:bg-background"
+              autoFocus
+            />
 
+            <DownloadForm
+              targetUrl={targetUrl}
+              onDownload={handleDownload}
+              isDownloading={isDownloading}
+            />
           </div>
-        </main>
-      </div>
+
+          {/* Live preview */}
+          <AnimatePresence mode="wait">
+            {isFetching && !videoData ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-card/70 py-5 text-sm text-muted-foreground shadow-lg shadow-black/5"
+              >
+                <Loader2 className="size-4 animate-spin" />
+                Loading preview…
+              </motion.div>
+            ) : videoData ? (
+              <motion.div
+                key={videoData.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.2 }}
+                className="mt-4"
+              >
+                <VideoInfo data={videoData} />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
+      </main>
     </div>
   )
 }

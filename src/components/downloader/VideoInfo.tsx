@@ -45,10 +45,10 @@ function formatDate(d?: string): string {
 
 export function VideoInfo({ data }: { data: VideoData }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-2xl bg-card p-4 shadow-lg shadow-black/5 ring-1 ring-black/5 dark:ring-white/10 space-y-3">
       <div className="flex gap-3">
         {data.thumbnail && (
-          <div className="shrink-0 w-36 h-20 rounded-lg overflow-hidden bg-muted">
+          <div className="shrink-0 w-36 h-20 rounded-xl overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/thumbnail?url=${encodeURIComponent(data.thumbnail)}`}

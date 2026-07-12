@@ -26,6 +26,8 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-sidebar: var(--sidebar);
+  --color-page: var(--page);
+  --font-display: var(--font-fredoka), var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -33,29 +35,33 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.9rem;
+  /* Blue page canvas behind the white card (ytmp3-inspired). */
+  --page: oklch(0.64 0.166 259);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.18 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.968 0.003 260);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: oklch(0.968 0.003 260);
+  --muted-foreground: oklch(0.552 0.02 260);
+  --accent: oklch(0.968 0.007 260);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.922 0.004 260);
+  --input: oklch(0.922 0.004 260);
+  --ring: oklch(0.64 0.166 259);
   --sidebar: oklch(0.985 0 0);
 }
 
 .dark {
+  /* Deep navy canvas so the card still reads as a raised surface in dark mode. */
+  --page: oklch(0.205 0.035 265);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
