@@ -36,6 +36,8 @@
 
 :root {
   --radius: 0.9rem;
+  /* Easing for the light/dark view transition (ease-out-expo). */
+  --expo-out: cubic-bezier(0.16, 1, 0.3, 1);
   /* Bright cornflower-blue page canvas behind the white card (ytmp3-inspired). */
   --page: oklch(0.62 0.19 262);
   --background: oklch(1 0 0);
@@ -100,4 +102,40 @@
 }
 *::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Light/dark theme view transition (diagonal reveal) ─────────────────────── */
+::view-transition-group(root) {
+  animation-duration: 0.7s;
+  animation-timing-function: var(--expo-out);
+}
+::view-transition-new(root) {
+  animation-name: reveal-light;
+  animation-fill-mode: both;
+}
+::view-transition-old(root),
+.dark::view-transition-old(root) {
+  animation: none;
+  animation-fill-mode: both;
+  z-index: -1;
+}
+.dark::view-transition-new(root) {
+  animation-name: reveal-dark;
+  animation-fill-mode: both;
+}
+@keyframes reveal-dark {
+  from {
+    clip-path: polygon(50% -71%, -50% 71%, -50% 71%, 50% -71%);
+  }
+  to {
+    clip-path: polygon(50% -71%, -50% 71%, 50% 171%, 171% 50%);
+  }
+}
+@keyframes reveal-light {
+  from {
+    clip-path: polygon(171% 50%, 50% 171%, 50% 171%, 171% 50%);
+  }
+  to {
+    clip-path: polygon(171% 50%, 50% 171%, -50% 71%, 50% -71%);
+  }
 }
