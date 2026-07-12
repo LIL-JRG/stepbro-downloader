@@ -27,6 +27,23 @@ export default function Home() {
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [agreed, setAgreed] = useState(true)
+  const [usage, setUsage] = useState<{ limit: number; remaining: number } | null>(null)
+
+  // Fetch the current daily download allowance (server is the source of truth).
+  useEffect(() => {
+    let active = true
+    fetch('/api/limit')
+      .then((r) => r.json())
+      .then((d) => {
+        if (active && typeof d?.limit === 'number') {
+          setUsage({ limit: d.limit, remaining: d.remaining })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Remember the copyright consent across visits (deferred restore for hydration
   // safety + to avoid a synchronous setState in the effect body).
@@ -98,6 +115,10 @@ export default function Home() {
       toast.error('Paste a video URL first')
       return
     }
+    if (usage && usage.remaining <= 0) {
+      toast.error('Daily download limit reached. Please try again tomorrow.')
+      return
+    }
     setIsDownloading(true)
 
     fetch('/api/download', {
@@ -106,8 +127,11 @@ export default function Home() {
       body: JSON.stringify(config),
     }).then(async (res) => {
       if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error((data as { error?: string }).error || 'Download failed')
+        const data = await res.json().catch(() => ({})) as { error?: string; limit?: number; remaining?: number }
+        if (res.status === 429 && typeof data.limit === 'number') {
+          setUsage({ limit: data.limit, remaining: data.remaining ?? 0 })
+        }
+        throw new Error(data.error || 'Download failed')
       }
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -127,6 +151,8 @@ export default function Home() {
               token?: string
               filename?: string
               message?: string
+              remaining?: number
+              limit?: number
             }
             if (event.type === 'ready' && event.token) {
               const a = document.createElement('a')
@@ -135,6 +161,9 @@ export default function Home() {
               document.body.appendChild(a)
               a.click()
               document.body.removeChild(a)
+              if (typeof event.remaining === 'number' && typeof event.limit === 'number') {
+                setUsage({ limit: event.limit, remaining: event.remaining })
+              }
               toast.success('Download started')
               setIsDownloading(false)
             } else if (event.type === 'failed') {
@@ -207,8 +236,21 @@ export default function Home() {
                 targetUrl={targetUrl}
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
-                blocked={!agreed}
+                blocked={!agreed || (usage !== null && usage.remaining <= 0)}
               />
+
+              {usage && (
+                <p
+                  className={cn(
+                    'mt-2.5 text-center text-xs',
+                    usage.remaining <= 0 ? 'font-medium text-destructive' : 'text-muted-foreground'
+                  )}
+                >
+                  {usage.remaining > 0
+                    ? `${usage.remaining} of ${usage.limit} downloads left today`
+                    : 'Daily limit reached — resets tomorrow'}
+                </p>
+              )}
             </div>
 
             {/* Disclaimer */}

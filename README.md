@@ -185,6 +185,7 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `FFMPEG_BIN` | *(system PATH)* | Path to the ffmpeg binary |
 | `BGUTIL_URL` | *(disabled)* | URL of the bgutil PO token provider (used via the yt-dlp plugin) |
 | `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`); needed to bypass a blocked VPS IP |
+| `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day (in-memory, per instance) |
 | `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
 
 > **Local development on a residential IP** needs none of these — yt-dlp's default web

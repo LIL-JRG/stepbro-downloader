@@ -6,6 +6,7 @@ import { v4 as uuid } from 'uuid'
 import type { NextRequest } from 'next/server'
 import { registerTempFile } from '@/lib/temp-store'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
+import { getClientIp, peekLimit, consumeLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -77,6 +78,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'URL is required' }, { status: 400 })
   }
 
+  // Enforce the per-IP daily limit up front (a slot is only consumed on success).
+  const clientIp = getClientIp(request)
+  const status = peekLimit(clientIp)
+  if (status.remaining <= 0) {
+    return Response.json(
+      {
+        error: 'Daily download limit reached. Please try again tomorrow.',
+        limit: status.limit,
+        remaining: 0,
+      },
+      { status: 429 }
+    )
+  }
+
   const token = uuid()
   const tempDir = await mkdtemp(join(tmpdir(), `ytdlp-${token}-`))
 
@@ -133,7 +148,15 @@ export async function POST(request: NextRequest) {
 
             const filePath = join(tempDir, largest.f)
             registerTempFile(token, filePath, largest.f)
-            sendEvent(controller, encoder, { type: 'ready', token, filename: largest.f })
+            // Count this successful download against the daily limit.
+            const usage = consumeLimit(clientIp)
+            sendEvent(controller, encoder, {
+              type: 'ready',
+              token,
+              filename: largest.f,
+              remaining: usage.remaining,
+              limit: usage.limit,
+            })
           } catch (err) {
             sendEvent(controller, encoder, {
               type: 'failed',
