@@ -33,6 +33,7 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       copy: 'Copiar',
       copied: 'Copiado',
       downloadSrt: 'Descargar .srt',
+      download: 'Descargar',
       none: 'No hay subtítulos disponibles',
       another: 'Descargar otro',
       auto: 'auto',

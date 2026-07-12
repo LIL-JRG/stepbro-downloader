@@ -37,6 +37,7 @@ export const en = {
     copy: 'Copy',
     copied: 'Copied',
     downloadSrt: 'Download .srt',
+    download: 'Download',
     none: 'No subtitles available',
     another: 'Download another',
     auto: 'auto',
