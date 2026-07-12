@@ -12,6 +12,7 @@ import {
 import { Video, Music, Download, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/provider'
+import { Tap } from '@/components/ui/tap'
 
 export interface DownloadConfig {
   url: string
@@ -181,14 +182,16 @@ export function DownloadForm({ targetUrl, onDownload, isDownloading, blocked }: 
       </Select>
 
       {/* Download */}
-      <Button
-        onClick={handleSubmit}
-        disabled={disabled}
-        className="h-10 shrink-0 gap-2 rounded-full px-6 font-semibold"
-      >
-        {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-        {isDownloading ? m.form.downloading : m.form.download}
-      </Button>
+      <Tap>
+        <Button
+          onClick={handleSubmit}
+          disabled={disabled}
+          className="h-10 shrink-0 gap-2 rounded-full px-6 font-semibold"
+        >
+          {isDownloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {isDownloading ? m.form.downloading : m.form.download}
+        </Button>
+      </Tap>
     </div>
   )
 }

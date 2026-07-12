@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -13,9 +12,10 @@ import { DownloadForm, type DownloadConfig } from '@/components/downloader/Downl
 import { ResultPanel } from '@/components/downloader/ResultPanel'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
+import { DonateButton } from '@/components/donate-button'
 import { useI18n } from '@/i18n/provider'
 import { initSound, playCue } from '@/lib/sound'
-import { Loader2, Clipboard, Check, Flag, Film, Music, Zap, Heart } from 'lucide-react'
+import { Loader2, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
 
 // Where the Donate button points — change to your own sponsor/donation page.
 const DONATE_URL = 'https://ko-fi.com/jorgerasgado'
@@ -231,12 +231,7 @@ export default function Home() {
             stepbro downloader
           </span>
           <div className="flex items-center gap-2 text-white">
-            <a href={DONATE_URL} target="_blank" rel="noopener noreferrer">
-              <Button className="h-8 gap-1.5 rounded-full bg-amber-400 px-3.5 font-semibold text-amber-950 hover:bg-amber-300">
-                <Heart className="size-3.5" />
-                <span className="hidden sm:inline">{m.nav.donate}</span>
-              </Button>
-            </a>
+            <DonateButton href={DONATE_URL} label={m.nav.donate} />
             <LanguageSelector />
             <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
           </div>

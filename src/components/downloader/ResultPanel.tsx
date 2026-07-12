@@ -12,6 +12,7 @@ import {
 import { Download, Image as ImageIcon, FileText, Copy, Check, Eye, RotateCcw } from 'lucide-react'
 import { useI18n } from '@/i18n/provider'
 import { playCue } from '@/lib/sound'
+import { Tap } from '@/components/ui/tap'
 import type { VideoData } from './VideoInfo'
 
 interface ResultPanelProps {
@@ -83,11 +84,13 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
 
       {/* Primary actions — save the media, toggle the thumbnail preview */}
       <div className="flex flex-wrap gap-2">
-        <a href={`/api/download/${token}`} download={filename}>
-          <Button className="h-9 gap-1.5 rounded-full px-4">
-            <Download className="size-4" /> {m.result.saveFile}
-          </Button>
-        </a>
+        <Tap>
+          <a href={`/api/download/${token}`} download={filename}>
+            <Button className="h-9 gap-1.5 rounded-full px-4">
+              <Download className="size-4" /> {m.result.saveFile}
+            </Button>
+          </a>
+        </Tap>
         {video.thumbnail && (
           <Button
             variant="outline"
