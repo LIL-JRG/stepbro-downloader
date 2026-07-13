@@ -62,33 +62,42 @@ function buildArgs(
     // The 1080p "Premium" tier prefers YouTube's high-bitrate variant.
     const premiumFilter = premium ? '[format_note*=Premium]' : ''
 
-    // Both the video codec AND the audio codec must suit the container, or the
-    // merged file misbehaves in common players. VP9/AV1 inside MP4 plays as
-    // audio-only on Windows/QuickTime/Safari/iOS, and Opus inside MP4 has no
-    // sound. WebM pins its native VP9/AV1 + Opus; MKV takes anything (VLC plays
-    // it) so it keeps the highest resolution; MP4/MOV/FLV/AVI are the "H.264
-    // family" — pin H.264 (AVC) + AAC for universal compatibility (YouTube caps
-    // AVC at 1080p, so above that keep the real codec).
-    let videoPref: string
-    let audioExt: string
+    // The video codec must suit the container or the file misbehaves in common
+    // players:
+    //  - WebM: native VP9/AV1 + Opus.
+    //  - MKV:  plays anything (VLC-friendly) — keep the real best.
+    //  - MP4/MOV/FLV/AVI (the "plays everywhere" family): H.264 (AVC) is the only
+    //    universally-decodable codec. HEVC/VP9/AV1 inside these containers play as
+    //    video-only, silent, or not at all in many browsers/players — so prefer
+    //    H.264 in BOTH muxed and separate forms before falling back to another
+    //    codec. Sites like TikTok expose 1080p only in HEVC and H.264 only at a
+    //    lower resolution, so this favours compatibility over resolution (pick
+    //    MKV/WebM for the higher-res non-H.264 tiers). Above 1080p no H.264 exists
+    //    anyway (YouTube caps AVC at 1080p), so there we keep the real codec.
+    const hf = heightFilter
+    let fmt: string
     if (mergeFormat === 'webm') {
-      videoPref = 'bv*[ext=webm]'
-      audioExt = 'webm'
+      fmt = `bv*[ext=webm]${hf}+ba[ext=webm]/bv*${hf}+ba/b${hf}/b`
     } else if (mergeFormat === 'mkv') {
-      videoPref = 'bv*'
-      audioExt = 'm4a'
+      fmt = `bv*${hf}${premiumFilter}+ba/bv*${hf}+ba/b${hf}/b`
+    } else if (premium) {
+      // Premium is YouTube's high-bitrate 1080p (VP9); keep the real codec.
+      fmt = `bv*${hf}${premiumFilter}+ba[ext=m4a]/bv*${hf}+ba/b${hf}/b`
+    } else if (Number.isFinite(height) && height <= 1080) {
+      // Match H.264 under both codec names: YouTube reports "avc1.…", TikTok "h264".
+      const avc = "[vcodec~='^(avc1|h264)']"
+      fmt =
+        `bv*${avc}${hf}+ba[ext=m4a]` + // H.264 video + m4a audio (e.g. YouTube)
+        `/b${avc}${hf}` + //             muxed H.264 (e.g. TikTok combined)
+        `/bv*${avc}${hf}+ba` + //        H.264 video + any audio
+        `/bv*${hf}+ba` + //              any separate streams
+        `/b${hf}` + //                   any muxed (may be HEVC/VP9) — last resort
+        `/b`
     } else {
-      const qNum = Number.isFinite(height) ? height : Infinity
-      videoPref = qNum <= 1080 ? 'bv*[vcodec^=avc1]' : 'bv*'
-      audioExt = 'm4a'
+      // Supporter tiers above 1080p: no H.264 available, keep the real codec.
+      fmt = `bv*${hf}+ba[ext=m4a]/bv*${hf}+ba/b${hf}/b`
     }
-
-    const vsel = `${videoPref}${heightFilter}${premiumFilter}`
-    const combinedFallback = heightFilter ? `/b${heightFilter}/b` : '/b'
-    args.push(
-      '-f',
-      `${vsel}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`
-    )
+    args.push('-f', fmt)
     args.push('-S', 'res,fps,vbr,abr,vcodec:avc,acodec:m4a')
     args.push('--merge-output-format', mergeFormat)
   }
