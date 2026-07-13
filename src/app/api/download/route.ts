@@ -9,16 +9,26 @@ import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 import { getClientIp, peekLimit, consumeLimit, MAX_VIDEO_DURATION } from '@/lib/rate-limit'
 import { isBlocked } from '@/lib/blocklist'
 import { isValidKey } from '@/lib/supporter'
+import {
+  findAudioOption,
+  resolutionsFor,
+  videoRequiresSupporter,
+  audioRequiresSupporter,
+  FREE_MAX_HEIGHT,
+  DEFAULT_AUDIO,
+  DEFAULT_CONTAINER,
+  DEFAULT_RESOLUTION,
+  VIDEO_CONTAINERS,
+} from '@/lib/formats'
 
 export const runtime = 'nodejs'
 
 interface DownloadOptions {
   url: string
-  quality: string
-  container: string
   audioOnly?: boolean
-  audioFormat?: string
-  audioQuality?: string
+  container?: string
+  quality?: string
+  audioOption?: string
 }
 
 function buildArgs(
@@ -31,21 +41,37 @@ function buildArgs(
   args.push('-o', join(outDir, '%(title).100s [%(id)s].%(ext)s'), '--restrict-filenames')
 
   if (opts.audioOnly) {
-    args.push('-x')
-    if (opts.audioFormat) args.push('--audio-format', opts.audioFormat)
-    args.push('--audio-quality', opts.audioQuality ?? '0')
+    const opt = findAudioOption(opts.audioOption) ?? findAudioOption(DEFAULT_AUDIO)!
+    args.push('-x', '--audio-format', opt.format)
+    args.push('--audio-quality', opt.quality ?? '0')
   } else {
-    const quality = opts.quality ?? 'best'
-    const container = opts.container ?? 'any'
-    const mergeFormat = container !== 'any' ? container : 'mp4'
-    const heightFilter = quality === 'best' ? '' : `[height<=${quality}]`
+    const container = VIDEO_CONTAINERS.includes(opts.container as never)
+      ? (opts.container as string)
+      : DEFAULT_CONTAINER
+    const quality = resolutionsFor(container).some((r) => r.value === opts.quality)
+      ? (opts.quality as string)
+      : DEFAULT_RESOLUTION
+    const mergeFormat = container
+    const premium = quality === '1080premium'
+
+    // Effective height ceiling. "Auto" is the real best for supporters, but a
+    // non-supporter is always clamped to the free cap (1080p) regardless of pick.
+    let height: number
+    if (premium) height = 1080
+    else if (quality === 'best') height = supporter ? Infinity : FREE_MAX_HEIGHT
+    else height = Number(quality)
+    if (!supporter) height = Math.min(height, FREE_MAX_HEIGHT)
+    const heightFilter = Number.isFinite(height) ? `[height<=${height}]` : ''
+    // The 1080p "Premium" tier prefers YouTube's high-bitrate variant.
+    const premiumFilter = premium ? '[format_note*=Premium]' : ''
 
     // Both the video codec AND the audio codec must suit the container, or the
     // merged file misbehaves in common players. VP9/AV1 inside MP4 plays as
     // audio-only on Windows/QuickTime/Safari/iOS, and Opus inside MP4 has no
-    // sound — so MP4 pins H.264 (AVC) + AAC (universal; YouTube caps AVC at
-    // 1080p, use WebM/MKV for higher). WebM pins its native VP9/AV1 + Opus; MKV
-    // takes anything (VLC plays it) so it keeps the highest resolution.
+    // sound. WebM pins its native VP9/AV1 + Opus; MKV takes anything (VLC plays
+    // it) so it keeps the highest resolution; MP4/MOV/FLV/AVI are the "H.264
+    // family" — pin H.264 (AVC) + AAC for universal compatibility (YouTube caps
+    // AVC at 1080p, so above that keep the real codec).
     let videoPref: string
     let audioExt: string
     if (mergeFormat === 'webm') {
@@ -55,19 +81,16 @@ function buildArgs(
       videoPref = 'bv*'
       audioExt = 'm4a'
     } else {
-      // MP4: H.264 is universal but YouTube caps it at 1080p. So force H.264 only
-      // when the requested resolution is ≤1080p; for "Best" or 1440p/4K keep the
-      // real resolution (VP9/AV1 in MP4 — plays in modern players & VLC), since no
-      // H.264 exists above 1080p. The -S sort still prefers H.264 at equal res.
-      const qNum = quality === 'best' ? Infinity : Number(quality)
+      const qNum = Number.isFinite(height) ? height : Infinity
       videoPref = qNum <= 1080 ? 'bv*[vcodec^=avc1]' : 'bv*'
       audioExt = 'm4a'
     }
 
+    const vsel = `${videoPref}${heightFilter}${premiumFilter}`
     const combinedFallback = heightFilter ? `/b${heightFilter}/b` : '/b'
     args.push(
       '-f',
-      `${videoPref}${heightFilter}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`,
+      `${vsel}+ba[ext=${audioExt}]/bv*${heightFilter}+ba${combinedFallback}`
     )
     args.push('-S', 'res,fps,vbr,abr,vcodec:avc,acodec:m4a')
     args.push('--merge-output-format', mergeFormat)
@@ -109,6 +132,20 @@ export async function POST(request: NextRequest) {
   // A valid supporter key (validated server-side on every request) bypasses the
   // daily limit and the duration cap. DMCA blocks still apply to everyone.
   const supporter = isValidKey(request.headers.get('x-supporter-key'))
+
+  // Backstop for the quality gate: the UI hides supporter-only tiers from free
+  // users, but reject them here too so the API itself can't be used to bypass it.
+  if (!supporter) {
+    const gated = opts.audioOnly
+      ? audioRequiresSupporter(opts.audioOption)
+      : videoRequiresSupporter(opts.container ?? DEFAULT_CONTAINER, opts.quality ?? DEFAULT_RESOLUTION)
+    if (gated) {
+      return Response.json(
+        { error: 'This quality requires a supporter license.' },
+        { status: 403 }
+      )
+    }
+  }
 
   // Enforce the per-IP daily limit up front (a slot is only consumed on success).
   const clientIp = getClientIp(request)

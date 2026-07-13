@@ -47,6 +47,7 @@ export default function Home() {
   const [supporterKey, setSupporterKey] = useState<string | null>(null)
   const [supporter, setSupporter] = useState(false)
   const [supporterInfo, setSupporterInfo] = useState<{ plan?: string; expiresAt?: number | null }>({})
+  const [supporterOpen, setSupporterOpen] = useState(false)
   const downloadAbort = useRef<AbortController | null>(null)
 
   // Load interaction sounds (cuelume) once on the client.
@@ -278,6 +279,8 @@ export default function Home() {
               maxDuration={supporter ? 10800 : maxDuration}
               onApply={applySupporterKey}
               onRemove={() => applySupporterKey(null)}
+              open={supporterOpen}
+              onOpenChange={setSupporterOpen}
             />
             <LanguageSelector />
             <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
@@ -326,6 +329,8 @@ export default function Home() {
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
                 blocked={!agreed || (!supporter && (tooLong || (usage !== null && usage.remaining <= 0)))}
+                supporter={supporter}
+                onUpsell={() => setSupporterOpen(true)}
               />
 
               {isDownloading ? (

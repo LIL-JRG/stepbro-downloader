@@ -29,6 +29,9 @@ interface SupporterWidgetProps {
   maxDuration: number
   onApply: (key: string) => void
   onRemove: () => void
+  /** Optional controlled open state (e.g. to trigger the modal from an upsell). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 type View = 'plans' | 'activate' | 'key'
@@ -38,7 +41,9 @@ type View = 'plans' | 'activate' | 'key'
 // view, and a license-key entry/recovery view.
 export function SupporterWidget(props: SupporterWidgetProps) {
   const { m } = useI18n()
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = props.open ?? internalOpen
+  const setOpen = props.onOpenChange ?? setInternalOpen
   const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
@@ -46,7 +51,7 @@ export function SupporterWidget(props: SupporterWidgetProps) {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [open, setOpen])
 
   // Donate-style amber pill with the amicro icon-swap on hover (star → heart);
   // turns emerald once the supporter license is active.

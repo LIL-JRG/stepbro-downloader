@@ -16,7 +16,7 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       placeholder: 'Pega aquí la URL del video…',
       paste: 'Pegar del portapapeles',
     },
-    form: { best: 'Mejor', download: 'Descargar', downloading: 'Descargando…', cancel: 'Cancelar' },
+    form: { best: 'Mejor', auto: 'Auto', mp3: 'MP3', supporterOnly: 'Supporter', download: 'Descargar', downloading: 'Descargando…', cancel: 'Cancelar' },
     usage: {
       left: '{remaining} de {limit} descargas restantes hoy',
       reached: 'Límite diario alcanzado — se reinicia mañana',
