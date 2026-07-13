@@ -1,41 +1,55 @@
 /**
- * DMCA blocklist + report log, persisted to DATA_DIR/dmca.json.
+ * DMCA reports + blocklist, persisted to DATA_DIR/dmca.json.
  *
- * When a rights holder submits a report, the video's key is added to the blocklist
- * and further /api/info and /api/download requests for it are refused. Single
- * process + file-backed (mount a volume at DATA_DIR to keep it across redeploys),
- * consistent with the rate-limiter.
+ * Reports are NOT auto-blocking: a submission is queued as `pending` and only
+ * blocks the video once an operator approves it from the admin review page. This
+ * prevents anyone from taking down arbitrary videos. The effective blocklist is
+ * always derived from approved reports. File-backed and single-process, like the
+ * rate-limiter (mount a volume at DATA_DIR to persist across redeploys).
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { v4 as uuid } from 'uuid'
 
-interface Report {
+export type ReportStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Report {
+  id: string
   key: string
   url: string
   email: string
   reason: string
   ts: number
-}
-
-interface Store {
-  blocked: string[]
-  reports: Report[]
+  status: ReportStatus
 }
 
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
 const FILE = join(DATA_DIR, 'dmca.json')
 
-const store: Store = { blocked: [], reports: [] }
+let reports: Report[] = []
 try {
-  const parsed = JSON.parse(readFileSync(FILE, 'utf8')) as Partial<Store>
-  if (Array.isArray(parsed.blocked)) store.blocked = parsed.blocked
-  if (Array.isArray(parsed.reports)) store.reports = parsed.reports
+  const parsed = JSON.parse(readFileSync(FILE, 'utf8')) as { reports?: Report[] }
+  if (Array.isArray(parsed.reports)) reports = parsed.reports
 } catch {
   /* no file yet */
 }
 
-const blocked = new Set(store.blocked)
+// Effective blocklist is derived from approved reports only.
+let blocked = new Set(reports.filter((r) => r.status === 'approved').map((r) => r.key))
+
+function persist(): void {
+  try {
+    mkdirSync(DATA_DIR, { recursive: true })
+    writeFileSync(FILE, JSON.stringify({ blocked: [...blocked], reports }))
+  } catch {
+    /* best effort */
+  }
+}
+
+function rebuildBlocked(): void {
+  blocked = new Set(reports.filter((r) => r.status === 'approved').map((r) => r.key))
+}
 
 /** Normalise a URL to a stable key — the YouTube video id when present. */
 export function videoKey(url: string): string {
@@ -48,15 +62,35 @@ export function isBlocked(url: string): boolean {
   return blocked.has(videoKey(url))
 }
 
-export function addReport(input: { url: string; email: string; reason: string }): void {
+/** Queue a report for review. Deduplicates against an existing open report. */
+export function addReport(input: { url: string; email: string; reason: string }): Report {
   const key = videoKey(input.url)
-  blocked.add(key)
-  store.reports.push({ key, url: input.url, email: input.email, reason: input.reason, ts: Date.now() })
-  store.blocked = [...blocked]
-  try {
-    mkdirSync(DATA_DIR, { recursive: true })
-    writeFileSync(FILE, JSON.stringify(store))
-  } catch {
-    /* best effort */
+  const open = reports.find((r) => r.key === key && r.status !== 'rejected')
+  if (open) return open
+  const report: Report = {
+    id: uuid(),
+    key,
+    url: input.url,
+    email: input.email,
+    reason: input.reason,
+    ts: Date.now(),
+    status: 'pending',
   }
+  reports.push(report)
+  persist()
+  return report
+}
+
+export function listReports(): Report[] {
+  return [...reports].sort((a, b) => b.ts - a.ts)
+}
+
+/** Approve or reject a report; the blocklist is recomputed from approvals. */
+export function setReportStatus(id: string, status: ReportStatus): boolean {
+  const report = reports.find((r) => r.id === id)
+  if (!report) return false
+  report.status = status
+  rebuildBlocked()
+  persist()
+  return true
 }

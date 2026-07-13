@@ -40,8 +40,8 @@ export function ReportForm() {
         <CheckCircle2 className="size-10 text-emerald-500" />
         <p className="font-medium text-foreground">Report received</p>
         <p className="max-w-md text-sm text-muted-foreground">
-          Thanks — this video has been blocked from further downloads through the Service. We may
-          email you if we need clarification or to handle a counter-notice.
+          Thanks — your report will be reviewed, and if the claim is valid the video will be blocked
+          from further downloads. We may email you for clarification or counter-notice handling.
         </p>
       </div>
     )
@@ -51,8 +51,8 @@ export function ReportForm() {
     <form onSubmit={submit} className="space-y-5">
       <p className="flex items-start gap-2 rounded-2xl bg-muted/70 px-4 py-3 text-sm text-muted-foreground">
         <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-        Are you the rights holder of a video being downloaded through our site? Submit the URL below
-        and it will be blocked from further downloads.
+        Are you the rights holder of a video being downloaded through our site? Submit the URL below;
+        we&rsquo;ll review your report and block the video from further downloads if the claim is valid.
       </p>
 
       <div className="space-y-1.5">

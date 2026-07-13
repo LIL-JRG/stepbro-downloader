@@ -82,12 +82,13 @@ export default function CopyrightPage() {
           </h2>
           <p className="mt-2">
             We respect creators&rsquo; rights. If you are a rights holder (or their agent) and believe
-            your content is being downloaded through this Service without authorization, you can have
-            it blocked from further downloads via the{' '}
+            your content is being downloaded through this Service without authorization, submit a
+            notice via the{' '}
             <Link href="/report" className="font-medium text-foreground underline underline-offset-2">
               DMCA report page
             </Link>
-            . Valid notices are actioned promptly.
+            . Each report is reviewed, and content is blocked from further downloads when the claim is
+            valid.
           </p>
         </section>
       </div>
