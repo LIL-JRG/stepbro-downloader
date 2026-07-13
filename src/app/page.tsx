@@ -28,6 +28,9 @@ const SUPPORT_TIERS = [
 ] as const
 const CONSENT_KEY = 'stepbro-consent'
 const SUPPORTER_KEY = 'stepbro-key'
+// Last-known supporter status, cached so a reload renders as supporter instantly
+// instead of flashing the free UI until /api/limit responds.
+const SUPPORTER_CACHE = 'stepbro-supporter'
 
 function looksLikeUrl(s: string): boolean {
   return /^https?:\/\/\S+\.\S+/i.test(s.trim())
@@ -55,17 +58,38 @@ export default function Home() {
     initSound()
   }, [])
 
-  // Restore a saved supporter key (deferred → hydration-safe).
+  // Restore a saved supporter key and, if we cached a valid status last time,
+  // render as supporter immediately (deferred → hydration-safe). /api/limit
+  // below then reconciles with the server, so a revoked/expired key still gets
+  // corrected — we just avoid the free-UI flash on every reload.
   useEffect(() => {
     const stored = localStorage.getItem(SUPPORTER_KEY)
-    if (stored) queueMicrotask(() => setSupporterKey(stored))
+    if (!stored) return
+    let cache: { plan?: string; expiresAt?: number | null } | null = null
+    try {
+      cache = JSON.parse(localStorage.getItem(SUPPORTER_CACHE) || 'null')
+    } catch {
+      /* ignore */
+    }
+    queueMicrotask(() => {
+      setSupporterKey(stored)
+      if (cache) {
+        setSupporter(true)
+        setSupporterInfo({ plan: cache.plan, expiresAt: cache.expiresAt ?? null })
+        setMaxDuration(0)
+      }
+    })
   }, [])
 
   function applySupporterKey(key: string | null) {
     setSupporterKey(key)
     setSupporter(false) // /api/limit below confirms the perks server-side
-    if (key) localStorage.setItem(SUPPORTER_KEY, key)
-    else localStorage.removeItem(SUPPORTER_KEY)
+    if (key) {
+      localStorage.setItem(SUPPORTER_KEY, key)
+    } else {
+      localStorage.removeItem(SUPPORTER_KEY)
+      localStorage.removeItem(SUPPORTER_CACHE)
+    }
   }
 
   // Fetch the current daily download allowance (server is the source of truth).
@@ -83,10 +107,16 @@ export default function Home() {
           setSupporterInfo({ plan: d.plan, expiresAt: d.expiresAt ?? null })
           setUsage(null)
           setMaxDuration(0)
+          localStorage.setItem(
+            SUPPORTER_CACHE,
+            JSON.stringify({ plan: d.plan, expiresAt: d.expiresAt ?? null })
+          )
         } else if (typeof d?.limit === 'number') {
           setSupporter(false)
           setUsage({ limit: d.limit, remaining: d.remaining })
           setMaxDuration(typeof d.maxDuration === 'number' ? d.maxDuration : 0)
+          // The key we sent (if any) is no longer valid — drop the optimistic cache.
+          if (supporterKey) localStorage.removeItem(SUPPORTER_CACHE)
         }
       })
       .catch(() => {})

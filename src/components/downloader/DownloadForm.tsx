@@ -136,7 +136,7 @@ function VideoQualityMenu({
                         <span>
                           {CONTAINER_LABELS[c]} · {r.label}
                         </span>
-                        {r.supporter && <Crown className="size-3 shrink-0 text-amber-500" />}
+                        {locked && <Crown className="size-3 shrink-0 text-amber-500" />}
                         {selected && <Check className="ml-auto size-3.5 shrink-0" />}
                       </button>
                     )
@@ -194,11 +194,20 @@ export function DownloadForm({
   }, [])
 
   // Persist choices once restored (localStorage write is external sync, not setState).
+  // Only save the resolution once the user has actually picked one — otherwise the
+  // auto-default (status-dependent) would be stored and, on reload, mistaken for an
+  // explicit choice, pinning e.g. a supporter to 1080p instead of defaulting to 4K.
   useEffect(() => {
     if (!hydrated) return
     localStorage.setItem(
       PREFS_KEY,
-      JSON.stringify({ version: 2, mode, container, resolution, audioOption })
+      JSON.stringify({
+        version: 2,
+        mode,
+        container,
+        audioOption,
+        ...(pickedResolution.current ? { resolution } : {}),
+      })
     )
   }, [hydrated, mode, container, resolution, audioOption])
 
@@ -293,7 +302,7 @@ export function DownloadForm({
                 <SelectItem key={o.value} value={o.value} disabled={locked}>
                   <span className="flex items-center gap-2">
                     {audioLabel(o.value)}
-                    {o.supporter && <Crown className="size-3 text-amber-500" />}
+                    {locked && <Crown className="size-3 text-amber-500" />}
                   </span>
                 </SelectItem>
               )
