@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
   const dir = await mkdtemp(join(tmpdir(), 'ytdlp-sub-'))
   try {
     const args = [
-      ...(await commonYtdlpArgs()),
+      ...(await commonYtdlpArgs(url)),
       '--skip-download',
       '--write-subs',
       '--write-auto-subs', // fall back to auto-generated captions when there's no manual track

@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
   const progressRegex =
     /\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\S*)\s+at\s+([\d.]+\S*)\s+ETA\s+(\S+)/
 
-  const shared = await commonYtdlpArgs()
+  const shared = await commonYtdlpArgs(opts.url)
   const args = buildArgs(opts, tempDir, shared, supporter)
 
   let proc: ReturnType<typeof spawn> | null = null

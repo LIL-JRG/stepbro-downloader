@@ -41,8 +41,10 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
   const [copied, setCopied] = useState(false)
   const [showThumb, setShowThumb] = useState(false)
 
-  // Always JPG for maximum compatibility.
+  // Always JPG for maximum compatibility, served through our proxy (which sets
+  // the right headers per source and forces the download filename).
   const thumbSrc = video.thumbnail ? `/api/thumbnail?url=${encodeURIComponent(video.thumbnail)}` : ''
+  const thumbDownload = thumbSrc ? `${thumbSrc}&download=1` : ''
 
   async function toggleView() {
     if (srt !== null) { setSrt(null); return }
@@ -108,7 +110,7 @@ export function ResultPanel({ token, filename, video, onReset }: ResultPanelProp
         <div className="space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumbSrc} alt="thumbnail" className="max-h-56 w-auto rounded-xl" />
-          <a href={`${thumbSrc}&download=1`} download>
+          <a href={thumbDownload} download>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-full">
               <Download className="size-3.5" /> {m.result.download}
             </Button>

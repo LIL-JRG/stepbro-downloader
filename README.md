@@ -184,7 +184,8 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `YT_DLP_BIN` | `yt-dlp` | Path to the yt-dlp binary |
 | `FFMPEG_BIN` | *(system PATH)* | Path to the ffmpeg binary |
 | `BGUTIL_URL` | *(disabled)* | URL of the bgutil PO token provider (used via the yt-dlp plugin) |
-| `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`); needed to bypass a blocked VPS IP |
+| `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`) to bypass a blocked VPS IP. Applied **only to YouTube** (the site that needs it) so other sites aren't slowed by the proxy hop |
+| `YTDLP_PROXY_ALL` | `false` | Set `true` to route every site through `YTDLP_PROXY`, not just YouTube |
 | `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day |
 | `MAX_VIDEO_DURATION` | `3600` | Max allowed video length in seconds for free users (0 = unlimited); supporters are exempt |
 | `DATA_DIR` | `/data` (Docker) | Where per-IP rate-limit state is persisted; mount a volume here to keep it across redeploys |

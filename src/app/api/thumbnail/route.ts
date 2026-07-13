@@ -10,11 +10,21 @@ const YT_FALLBACKS: Record<string, string> = {
   'mqdefault.jpg': 'default.jpg',
 }
 
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+
+function isYouTubeThumb(url: string): boolean {
+  return /(?:ytimg\.com|youtube\.com|youtu\.be)/i.test(url)
+}
+
 async function fetchThumbnail(url: string): Promise<Response | null> {
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bot)', Referer: 'https://www.youtube.com/' },
-    })
+    // Only YouTube's image host wants (and accepts) a youtube.com referer; other
+    // CDNs — e.g. TikTok's signed tiktokcdn.com URLs — reject it, so send a plain
+    // browser UA with no referer instead.
+    const headers: Record<string, string> = { 'User-Agent': BROWSER_UA }
+    if (isYouTubeThumb(url)) headers.Referer = 'https://www.youtube.com/'
+    const res = await fetch(url, { headers })
     if (res.ok) return res
   } catch { /* ignore */ }
   return null
@@ -23,7 +33,8 @@ async function fetchThumbnail(url: string): Promise<Response | null> {
 // Fetch the JPG (with YouTube resolution fallbacks) as bytes.
 async function fetchJpg(url: string): Promise<Buffer | null> {
   let res = await fetchThumbnail(url)
-  if (!res) {
+  // The maxres→hqdefault fallback chain only applies to YouTube's /vi/ URLs.
+  if (!res && isYouTubeThumb(url)) {
     const match = url.match(/\/vi\/[^/]+\/([^/?#]+\.jpg)/)
     if (match) {
       let current = match[1]
@@ -57,12 +68,15 @@ function convertImage(input: Buffer, fmt: 'png' | 'webp'): Promise<Buffer> {
 }
 
 export async function GET(request: NextRequest) {
-  const raw = request.nextUrl.searchParams.get('url')
-  if (!raw) return new Response('Missing url', { status: 400 })
+  // searchParams.get() already percent-decodes once. Do NOT decode again — a
+  // second pass mangles URLs whose query carries encoded reserved chars, e.g.
+  // TikTok's signed thumbnails (x-signature=…%2B…%2F…%3D), breaking the
+  // signature so the CDN 403s. (YouTube URLs have no such encoding, which is why
+  // this only ever showed up on TikTok/others.)
+  const url = request.nextUrl.searchParams.get('url')
+  if (!url) return new Response('Missing url', { status: 400 })
 
-  let url: string
   try {
-    url = decodeURIComponent(raw)
     new URL(url) // validate
   } catch {
     return new Response('Invalid url', { status: 400 })

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return Response.json(cached.body)
   }
 
-  const args = [...(await commonYtdlpArgs()), '--dump-json', '--no-playlist', url]
+  const args = [...(await commonYtdlpArgs(url)), '--dump-json', '--no-playlist', url]
 
   return new Promise<Response>((resolve) => {
     const chunks: string[] = []
