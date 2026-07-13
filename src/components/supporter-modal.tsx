@@ -13,6 +13,9 @@ import { playCue } from '@/lib/sound'
 interface SupporterWidgetProps {
   supporter: boolean
   supporterKey: string | null
+  /** Active plan details (from /api/limit) for the status view. */
+  plan?: string | null
+  expiresAt?: number | null
   donateUrl: string
   /** Free-tier numbers shown in the comparison table. */
   freeLimit: number
@@ -29,6 +32,7 @@ type View = 'plans' | 'activate' | 'key'
 export function SupporterWidget(props: SupporterWidgetProps) {
   const { m } = useI18n()
   const [open, setOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -37,24 +41,42 @@ export function SupporterWidget(props: SupporterWidgetProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
+  // Donate-style amber pill with the amicro icon-swap on hover (star → heart);
+  // turns emerald once the supporter license is active.
+  const Icon = props.supporter ? Star : hovered ? Heart : Star
   return (
     <>
-      <button
+      <motion.button
         type="button"
+        onHoverStart={() => setHovered(true)}
+        onHoverEnd={() => setHovered(false)}
+        whileTap={{ scale: 0.96 }}
         onClick={() => {
           playCue('bloom')
           setOpen(true)
         }}
         className={cn(
-          'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors',
+          'inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-colors',
           props.supporter
             ? 'bg-emerald-400/90 text-emerald-950 hover:bg-emerald-300'
-            : 'bg-white/15 text-white hover:bg-white/25'
+            : 'bg-amber-400 text-amber-950 hover:bg-amber-300'
         )}
       >
-        <Star className={cn('size-3.5', props.supporter && 'fill-current')} />
+        <span className="grid size-3.5 place-items-center">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={Icon === Heart ? 'heart' : 'star'}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -6 }}
+              transition={{ type: 'spring', stiffness: 600, damping: 25 }}
+            >
+              <Icon className={cn('size-3.5', props.supporter && 'fill-current')} />
+            </motion.span>
+          </AnimatePresence>
+        </span>
         <span className="hidden sm:inline">{m.supporter.widget}</span>
-      </button>
+      </motion.button>
 
       <AnimatePresence>
         {open && <SupporterModal {...props} onClose={() => setOpen(false)} />}
@@ -66,6 +88,8 @@ export function SupporterWidget(props: SupporterWidgetProps) {
 function SupporterModal({
   supporter,
   supporterKey,
+  plan,
+  expiresAt,
   donateUrl,
   freeLimit,
   maxDuration,
@@ -201,6 +225,20 @@ function SupporterModal({
         {supporter ? (
           <div className="mt-4 space-y-4">
             <p className="text-sm text-muted-foreground">{m.supporter.activeText}</p>
+            <p className="text-sm font-medium">
+              {plan === '7d'
+                ? m.supporter.plan7d
+                : plan === '30d'
+                  ? m.supporter.plan30d
+                  : plan === '90d'
+                    ? m.supporter.plan90d
+                    : m.supporter.planLifetime}
+              {expiresAt != null && (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  {m.supporter.expires.replace('{date}', new Date(expiresAt).toLocaleDateString())}
+                </span>
+              )}
+            </p>
             {supporterKey && (
               <div>
                 <p className="text-xs text-muted-foreground">{m.supporter.yourKey}</p>
@@ -251,6 +289,8 @@ function SupporterModal({
             >
               <Heart className="size-4" /> {m.supporter.become}
             </a>
+
+            <p className="text-center text-[11px] text-muted-foreground">{m.supporter.tiers}</p>
 
             <p className="text-center text-xs">
               <button

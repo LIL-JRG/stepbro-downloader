@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
-import { createKey, listKeys, setKeyRevoked } from '@/lib/supporter'
+import { createKey, listKeys, setKeyRevoked, PLANS, type Plan } from '@/lib/supporter'
 
 export const runtime = 'nodejs'
 
@@ -18,10 +18,12 @@ export async function POST(request: NextRequest) {
     action?: string
     note?: string
     code?: string
+    plan?: string
   }
 
   if (body.action === 'create') {
-    const key = createKey(typeof body.note === 'string' ? body.note.trim() : '')
+    const plan: Plan = PLANS.includes(body.plan as Plan) ? (body.plan as Plan) : 'lifetime'
+    const key = createKey(typeof body.note === 'string' ? body.note.trim() : '', plan)
     return Response.json({ key })
   }
   if ((body.action === 'revoke' || body.action === 'restore') && typeof body.code === 'string') {

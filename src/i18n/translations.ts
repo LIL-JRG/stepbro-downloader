@@ -73,6 +73,12 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       yourKey: 'Tu clave — guárdala en un lugar seguro:',
       copy: 'Copiar',
       close: 'Cerrar',
+      tiers: 'Licencias: 7 días · 30 días · 90 días · De por vida',
+      plan7d: 'Acceso completo — 7 días',
+      plan30d: 'Acceso completo — 30 días',
+      plan90d: 'Acceso completo — 90 días',
+      planLifetime: 'Membresía de por vida — Acceso completo',
+      expires: 'Expira el {date}',
     },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {

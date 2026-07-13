@@ -22,7 +22,16 @@ interface SupporterKey {
   ts: number
   revoked: boolean
   email?: string
+  plan?: string
+  expiresAt?: number | null
 }
+
+const PLAN_OPTIONS = [
+  { value: '7d', label: '7-Day' },
+  { value: '30d', label: '30-Day' },
+  { value: '90d', label: '90-Day' },
+  { value: 'lifetime', label: 'Lifetime' },
+]
 
 const TOKEN_KEY = 'stepbro-admin'
 
@@ -32,6 +41,7 @@ export function AdminReports() {
   const [reports, setReports] = useState<Report[]>([])
   const [keys, setKeys] = useState<SupporterKey[]>([])
   const [note, setNote] = useState('')
+  const [plan, setPlan] = useState('lifetime')
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async (tk: string) => {
@@ -79,7 +89,7 @@ export function AdminReports() {
     }
   }
 
-  async function keyAction(body: { action: string; note?: string; code?: string }) {
+  async function keyAction(body: { action: string; note?: string; code?: string; plan?: string }) {
     const res = await fetch('/api/admin/keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -205,16 +215,25 @@ export function AdminReports() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            keyAction({ action: 'create', note })
+            keyAction({ action: 'create', note, plan })
           }}
-          className="mt-3 flex gap-2"
+          className="mt-3 flex flex-wrap gap-2"
         >
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Note (e.g. Ko-fi — Juan)"
-            className="h-9 rounded-xl"
+            className="h-9 min-w-40 flex-1 rounded-xl"
           />
+          <select
+            value={plan}
+            onChange={(e) => setPlan(e.target.value)}
+            className="h-9 rounded-xl border border-input bg-transparent px-2.5 text-sm outline-none"
+          >
+            {PLAN_OPTIONS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
           <Button type="submit" size="sm" className="h-9 shrink-0 gap-1.5 rounded-full px-4">
             <Plus className="size-3.5" /> Generate
           </Button>
@@ -233,9 +252,14 @@ export function AdminReports() {
                   {k.code}
                 </code>
                 <span className="text-xs text-muted-foreground">
+                  {(k.plan ?? 'lifetime').toUpperCase()} ·{' '}
                   {k.email && <>{k.email} · </>}
                   {k.note && <>{k.note} · </>}
                   {new Date(k.ts).toLocaleDateString()}
+                  {k.expiresAt != null &&
+                    (k.expiresAt > Date.now()
+                      ? ` · expires ${new Date(k.expiresAt).toLocaleDateString()}`
+                      : ' · EXPIRED')}
                   {k.revoked && ' · REVOKED'}
                 </span>
                 <span className="ml-auto flex gap-1.5">

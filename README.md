@@ -193,6 +193,8 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `ADMIN_TOKEN` | *(disabled)* | Enables the `/admin` page (DMCA review + supporter keys); sent as `Authorization: Bearer <token>`. Reports only block a video once approved here |
 
 | `KOFI_VERIFICATION_TOKEN` | *(disabled)* | Enables the Ko-fi payment webhook at `/api/kofi` (set it to the token shown at ko-fi.com/manage/webhooks) |
+| `KOFI_PRICE_30D` / `KOFI_PRICE_90D` / `KOFI_PRICE_LIFETIME` | `5` / `10` / `25` | Payment thresholds (in your Ko-fi currency) mapping a payment to a license tier; anything below `KOFI_PRICE_30D` grants 7-Day |
+| `EMAIL_LOOKUP_PER_HOUR` | `5` | Max license activations/recoveries by payment email per IP per hour (anti-guessing) |
 
 > **Supporter keys:** from `/admin` you can generate keys (`SB-XXXX-XXXX-XXXX`) for
 > supporters. Entering a key on the home page (navbar → Supporter, or "Have a
@@ -204,7 +206,13 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 > webhook at `https://your-domain/api/kofi` from ko-fi.com/manage/webhooks. When
 > someone pays, a key is granted to their payment email automatically — they then
 > click Supporter → enter that email, and their license activates on the spot (it
-> also works as key recovery).
+> also works as key recovery). The payment amount picks the tier (7/30/90-day or
+> Lifetime, thresholds via `KOFI_PRICE_*`); repeat payments extend or upgrade the
+> existing license.
+>
+> ⚠️ Email-based activation proves only knowledge of the buyer's email. It's
+> strictly rate-limited (`EMAIL_LOOKUP_PER_HOUR`), but for stronger verification
+> you'd need an email-delivery service to send a confirmation code.
 | `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
 
 > **Local development on a residential IP** needs none of these — yt-dlp's default web

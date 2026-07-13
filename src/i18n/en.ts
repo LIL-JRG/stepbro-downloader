@@ -77,6 +77,12 @@ export const en = {
     yourKey: 'Your key — save it somewhere safe:',
     copy: 'Copy',
     close: 'Close',
+    tiers: 'Licenses: 7-day · 30-day · 90-day · Lifetime',
+    plan7d: '7-Day Full Access',
+    plan30d: '30-Day Full Access',
+    plan90d: '90-Day Full Access',
+    planLifetime: 'Lifetime Membership — Full Access',
+    expires: 'Expires {date}',
   },
   preview: {
     loading: 'Loading preview…',

@@ -120,3 +120,22 @@ export function allowInfoRequest(ip: string): boolean {
   hit.count += 1
   return hit.count <= INFO_MAX
 }
+
+// ── License-recovery throttle ────────────────────────────────────────────────
+// Looking up a supporter key by payment email would let anyone who knows (or
+// guesses) a buyer's email claim their license, so it gets a much stricter
+// budget than general endpoints: 5 attempts per hour per IP.
+const EMAIL_WINDOW_MS = 60 * 60_000
+const EMAIL_MAX = Math.max(1, Number(process.env.EMAIL_LOOKUP_PER_HOUR ?? 5))
+const emailHits = new Map<string, { start: number; count: number }>()
+
+export function allowEmailLookup(ip: string): boolean {
+  const now = Date.now()
+  const hit = emailHits.get(ip)
+  if (!hit || now - hit.start > EMAIL_WINDOW_MS) {
+    emailHits.set(ip, { start: now, count: 1 })
+    return true
+  }
+  hit.count += 1
+  return hit.count <= EMAIL_MAX
+}

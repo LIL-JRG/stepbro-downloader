@@ -1,14 +1,22 @@
 /**
  * Supporter keys, persisted to DATA_DIR/supporters.json.
  *
- * A valid (non-revoked) key unlocks supporter perks — no daily download limit
- * and no duration cap. Keys are generated/revoked by the operator from /admin.
- * File-backed and single-process, like the rate-limiter and DMCA store.
+ * A valid (non-revoked, non-expired) key unlocks supporter perks — no daily
+ * download limit and no duration cap. Plans: 7-day, 30-day, 90-day, or lifetime.
+ * Keys are generated/revoked by the operator from /admin, or granted
+ * automatically by the Ko-fi payment webhook. File-backed and single-process,
+ * like the rate-limiter and DMCA store.
  */
 import { randomBytes } from 'crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+
+export type Plan = '7d' | '30d' | '90d' | 'lifetime'
+
+export const PLANS: Plan[] = ['7d', '30d', '90d', 'lifetime']
+
+const PLAN_DAYS: Record<Exclude<Plan, 'lifetime'>, number> = { '7d': 7, '30d': 30, '90d': 90 }
 
 export interface SupporterKey {
   code: string
@@ -17,6 +25,10 @@ export interface SupporterKey {
   revoked: boolean
   /** Payment email (set for keys granted via the Ko-fi webhook). */
   email?: string
+  /** Missing on keys created before plans existed — treated as lifetime. */
+  plan?: Plan
+  /** Epoch ms; null/undefined = never expires. */
+  expiresAt?: number | null
 }
 
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
@@ -52,10 +64,26 @@ function normalize(code: string): string {
   return code.trim().toUpperCase()
 }
 
-export function createKey(note: string): SupporterKey {
+function isActive(key: SupporterKey): boolean {
+  if (key.revoked) return false
+  return key.expiresAt == null || key.expiresAt > Date.now()
+}
+
+function expiryFor(plan: Plan, from = Date.now()): number | null {
+  return plan === 'lifetime' ? null : from + PLAN_DAYS[plan] * 86_400_000
+}
+
+export function createKey(note: string, plan: Plan = 'lifetime'): SupporterKey {
   let code = generateCode()
   while (keys.some((k) => k.code === code)) code = generateCode()
-  const key: SupporterKey = { code, note: note.slice(0, 200), ts: Date.now(), revoked: false }
+  const key: SupporterKey = {
+    code,
+    note: note.slice(0, 200),
+    ts: Date.now(),
+    revoked: false,
+    plan,
+    expiresAt: expiryFor(plan),
+  }
   keys.push(key)
   persist()
   return key
@@ -74,26 +102,43 @@ export function setKeyRevoked(code: string, revoked: boolean): boolean {
 }
 
 export function isValidKey(code: string | null | undefined): boolean {
-  if (!code) return false
+  return !!getKeyInfo(code)
+}
+
+/** The key record when the code is valid (active + not expired), else null. */
+export function getKeyInfo(code: string | null | undefined): SupporterKey | null {
+  if (!code) return null
   const key = keys.find((k) => k.code === normalize(code))
-  return !!key && !key.revoked
+  return key && isActive(key) ? key : null
 }
 
 /** Active key for a payment email (used for activation and key recovery). */
 export function findKeyByEmail(email: string): SupporterKey | null {
   const needle = email.trim().toLowerCase()
   if (!needle) return null
-  return keys.find((k) => !k.revoked && k.email?.toLowerCase() === needle) ?? null
+  return keys.find((k) => isActive(k) && k.email?.toLowerCase() === needle) ?? null
 }
 
 /**
- * Grant a key to a payment email (Ko-fi webhook). Idempotent: returns the
- * existing active key for that email if one exists.
+ * Grant a plan to a payment email (Ko-fi webhook). Idempotent and
+ * renewal-friendly: an existing active key is upgraded (lifetime wins) or
+ * extended (timed plans stack on top of the current expiry).
  */
-export function grantKeyForEmail(email: string, note: string): SupporterKey {
+export function grantKeyForEmail(email: string, note: string, plan: Plan = 'lifetime'): SupporterKey {
   const existing = findKeyByEmail(email)
-  if (existing) return existing
-  const key = createKey(note)
+  if (existing) {
+    if (plan === 'lifetime') {
+      existing.plan = 'lifetime'
+      existing.expiresAt = null
+    } else if (existing.expiresAt != null) {
+      existing.plan = plan
+      existing.expiresAt = expiryFor(plan, Math.max(Date.now(), existing.expiresAt))
+    }
+    // lifetime existing + timed payment → keep lifetime.
+    persist()
+    return existing
+  }
+  const key = createKey(note, plan)
   key.email = email.trim().toLowerCase()
   persist()
   return key

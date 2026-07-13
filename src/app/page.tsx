@@ -13,7 +13,6 @@ import { DownloadForm, type DownloadConfig } from '@/components/downloader/Downl
 import { ResultPanel } from '@/components/downloader/ResultPanel'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
-import { DonateButton } from '@/components/donate-button'
 import { SupporterEntry } from '@/components/supporter-entry'
 import { SupporterWidget } from '@/components/supporter-modal'
 import { useI18n } from '@/i18n/provider'
@@ -42,6 +41,7 @@ export default function Home() {
   const [result, setResult] = useState<{ token: string; filename: string } | null>(null)
   const [supporterKey, setSupporterKey] = useState<string | null>(null)
   const [supporter, setSupporter] = useState(false)
+  const [supporterInfo, setSupporterInfo] = useState<{ plan?: string; expiresAt?: number | null }>({})
   const downloadAbort = useRef<AbortController | null>(null)
 
   // Load interaction sounds (cuelume) once on the client.
@@ -74,6 +74,7 @@ export default function Home() {
         if (!active) return
         if (d?.supporter) {
           setSupporter(true)
+          setSupporterInfo({ plan: d.plan, expiresAt: d.expiresAt ?? null })
           setUsage(null)
           setMaxDuration(0)
         } else if (typeof d?.limit === 'number') {
@@ -265,13 +266,14 @@ export default function Home() {
             <SupporterWidget
               supporter={supporter}
               supporterKey={supporterKey}
+              plan={supporterInfo.plan}
+              expiresAt={supporterInfo.expiresAt}
               donateUrl={DONATE_URL}
               freeLimit={usage?.limit ?? 5}
               maxDuration={supporter ? 10800 : maxDuration}
               onApply={applySupporterKey}
               onRemove={() => applySupporterKey(null)}
             />
-            <DonateButton href={DONATE_URL} label={m.nav.donate} />
             <LanguageSelector />
             <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />
           </div>
