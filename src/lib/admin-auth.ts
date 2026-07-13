@@ -8,10 +8,8 @@ import type { NextRequest } from 'next/server'
 export function requireAdmin(request: NextRequest): Response | null {
   const token = process.env.ADMIN_TOKEN
   if (!token) {
-    return Response.json(
-      { error: 'Admin is disabled. Set ADMIN_TOKEN to enable it.' },
-      { status: 503 }
-    )
+    // Deliberately vague — don't tell strangers how to enable it (see README).
+    return Response.json({ error: 'Admin is disabled.' }, { status: 503 })
   }
   if (request.headers.get('authorization') !== `Bearer ${token}`) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })

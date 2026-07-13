@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Check, X, Loader2, ExternalLink, Copy, KeyRound, Plus } from 'lucide-react'
+import { Check, X, Loader2, ExternalLink, Copy, KeyRound, Plus, ChevronDown } from 'lucide-react'
 
 interface Report {
   id: string
@@ -134,9 +134,7 @@ export function AdminReports() {
         }}
         className="space-y-3"
       >
-        <p className="text-sm text-muted-foreground">
-          Enter the admin token (the <code>ADMIN_TOKEN</code> env var) to review reports.
-        </p>
+        <p className="text-sm text-muted-foreground">Enter the admin token to continue.</p>
         <div className="flex gap-2">
           <Input
             type="password"
@@ -236,15 +234,18 @@ export function AdminReports() {
             placeholder="Note (e.g. Ko-fi — Juan)"
             className="h-9 min-w-40 flex-1 rounded-xl"
           />
-          <select
-            value={plan}
-            onChange={(e) => setPlan(e.target.value)}
-            className="h-9 rounded-xl border border-input bg-transparent px-2.5 text-sm outline-none"
-          >
-            {PLAN_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
-            ))}
-          </select>
+          <span className="relative inline-flex">
+            <select
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              className="h-9 appearance-none rounded-xl border border-input bg-transparent pr-9 pl-3 text-sm outline-none"
+            >
+              {PLAN_OPTIONS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          </span>
           <Input
             type="number"
             min={1}
