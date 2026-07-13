@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Star, X, Check, Minus, Loader2, Copy, Heart } from 'lucide-react'
+import { Star, X, Check, Minus, Loader2, Copy, Heart, Crown, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/provider'
 import { playCue } from '@/lib/sound'
@@ -292,18 +292,18 @@ function SupporterModal({
               ))}
             </div>
 
-            {/* One button per Ko-fi shop item — clicking opens the item in a new
+            {/* One card per Ko-fi shop item — clicking opens the item in a new
                 tab and flips the modal to the activation view. */}
             <div className="space-y-2">
               {tiers.map((t) => {
-                const label =
+                const duration =
                   t.plan === '7d'
-                    ? m.supporter.plan7d
+                    ? m.supporter.dur7d
                     : t.plan === '30d'
-                      ? m.supporter.plan30d
+                      ? m.supporter.dur30d
                       : t.plan === '90d'
-                        ? m.supporter.plan90d
-                        : m.supporter.planLifetime
+                        ? m.supporter.dur90d
+                        : m.supporter.durLifetime
                 const highlight = t.plan === 'lifetime'
                 return (
                   <a
@@ -313,17 +313,32 @@ function SupporterModal({
                     rel="noopener noreferrer"
                     onClick={() => setView('activate')}
                     className={cn(
-                      'flex h-11 w-full items-center justify-between rounded-full px-5 text-sm font-semibold transition-colors',
+                      'group flex items-center gap-3 rounded-2xl border p-3 transition-all hover:-translate-y-0.5 hover:shadow-md',
                       highlight
-                        ? 'bg-amber-400 text-amber-950 hover:bg-amber-300'
-                        : 'bg-muted text-foreground hover:bg-muted/70'
+                        ? 'border-amber-400 bg-amber-400/10 hover:bg-amber-400/15'
+                        : 'border-border bg-muted/50 hover:bg-muted'
                     )}
                   >
-                    <span className="flex items-center gap-2">
-                      {highlight && <Heart className="size-4" />}
-                      {label}
+                    <span
+                      className={cn(
+                        'grid size-9 shrink-0 place-items-center rounded-full',
+                        highlight ? 'bg-amber-400 text-amber-950' : 'bg-background text-muted-foreground'
+                      )}
+                    >
+                      {highlight ? <Crown className="size-4" /> : <Clock className="size-4" />}
                     </span>
-                    <span className="tabular-nums">{t.price}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold">{duration}</span>
+                        {highlight && (
+                          <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-950">
+                            {m.supporter.bestValue}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{m.supporter.fullAccess}</span>
+                    </div>
+                    <span className="shrink-0 text-base font-extrabold tabular-nums">{t.price}</span>
                   </a>
                 )
               })}

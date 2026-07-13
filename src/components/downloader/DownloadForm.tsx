@@ -124,12 +124,12 @@ function VideoQualityMenu({
                         key={r.value}
                         type="button"
                         onClick={() => {
+                          setOpen(false)
                           if (locked) {
                             onUpsell?.()
                             return
                           }
                           onChange(c, r.value)
-                          setOpen(false)
                         }}
                         className={cn(
                           'flex w-full items-center gap-2 rounded-lg py-1.5 pr-3 pl-8 text-sm whitespace-nowrap transition-colors hover:bg-accent',
