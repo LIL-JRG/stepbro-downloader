@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Video, Music, Download, Loader2, Lock } from 'lucide-react'
+import { Video, Music, Download, Loader2, Crown, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/provider'
 import { Tap } from '@/components/ui/tap'
@@ -46,6 +46,113 @@ interface DownloadFormProps {
 }
 
 const PREFS_KEY = 'stepbro-prefs'
+
+/**
+ * Single video-quality control: a dropdown grouped by container (MP4, WebM, …),
+ * each collapsible into its resolutions. Supporter-only tiers show a crown and
+ * open the upsell instead of selecting when the user isn't a supporter.
+ */
+function VideoQualityMenu({
+  container,
+  resolution,
+  supporter,
+  onChange,
+  onUpsell,
+}: {
+  container: string
+  resolution: string
+  supporter: boolean
+  onChange: (container: string, resolution: string) => void
+  onUpsell?: () => void
+}) {
+  const { m } = useI18n()
+  const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(container)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const resLabel = (value: string, label: string) => (value === 'best' ? m.form.auto : label)
+  const triggerLabel = `${CONTAINER_LABELS[container]} · ${resLabel(
+    resolution,
+    resolutionsFor(container).find((r) => r.value === resolution)?.label ?? ''
+  )}`
+
+  return (
+    <div ref={ref} className="relative min-w-0 flex-1 sm:min-w-44">
+      <button
+        type="button"
+        onClick={() => {
+          setExpanded(container)
+          setOpen((o) => !o)
+        }}
+        className="flex h-10 w-full items-center justify-between gap-1.5 rounded-full border border-input bg-transparent px-4 text-sm font-medium whitespace-nowrap outline-none transition-colors hover:bg-muted/50 dark:bg-input/30"
+      >
+        <span className="truncate">{triggerLabel}</span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-50 mt-1.5 max-h-80 w-max min-w-full overflow-y-auto rounded-2xl bg-popover p-1.5 shadow-lg ring-1 ring-foreground/10">
+          {VIDEO_CONTAINERS.map((c) => {
+            const isExpanded = expanded === c
+            return (
+              <div key={c}>
+                <button
+                  type="button"
+                  onClick={() => setExpanded((e) => (e === c ? null : c))}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold transition-colors hover:bg-accent"
+                >
+                  <ChevronRight
+                    className={cn('size-3.5 text-muted-foreground transition-transform', isExpanded && 'rotate-90')}
+                  />
+                  {CONTAINER_LABELS[c]}
+                </button>
+                {isExpanded &&
+                  resolutionsFor(c).map((r) => {
+                    const locked = r.supporter && !supporter
+                    const selected = container === c && resolution === r.value
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => {
+                          if (locked) {
+                            onUpsell?.()
+                            return
+                          }
+                          onChange(c, r.value)
+                          setOpen(false)
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg py-1.5 pr-3 pl-8 text-sm whitespace-nowrap transition-colors hover:bg-accent',
+                          selected && 'font-semibold',
+                          locked && 'opacity-55'
+                        )}
+                      >
+                        <span>
+                          {CONTAINER_LABELS[c]} · {resLabel(r.value, r.label)}
+                        </span>
+                        {r.supporter && <Crown className="size-3 shrink-0 text-amber-500" />}
+                        {selected && <Check className="ml-auto size-3.5 shrink-0" />}
+                      </button>
+                    )
+                  })}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function DownloadForm({
   targetUrl,
@@ -92,12 +199,10 @@ export function DownloadForm({
     )
   }, [hydrated, mode, container, resolution, audioOption])
 
-  const resolutions = resolutionsFor(container)
-
   // Keep the resolution valid for the current container (e.g. 1080p Premium only
   // exists on MP4), and never leave a locked pick selected for a non-supporter.
   useEffect(() => {
-    const current = resolutions.find((r) => r.value === resolution)
+    const current = resolutionsFor(container).find((r) => r.value === resolution)
     if (!current || (current.supporter && !supporter)) {
       queueMicrotask(() => setResolution(DEFAULT_RESOLUTION))
     }
@@ -125,8 +230,6 @@ export function DownloadForm({
     const base = AUDIO_LABELS[value] ?? value
     return value.startsWith('mp3-') ? base.replace('MP3', m.form.mp3 ?? 'MP3') : base
   }
-  const resolutionLabel = (r: { value: string; label: string }) =>
-    r.value === 'best' ? m.form.auto : r.label
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -150,56 +253,16 @@ export function DownloadForm({
       </div>
 
       {mode === 'mp4' ? (
-        <>
-          {/* Container */}
-          <Select value={container} onValueChange={(v) => v && setContainer(v)}>
-            <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-24">
-              <SelectValue>{CONTAINER_LABELS[container]}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {VIDEO_CONTAINERS.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {CONTAINER_LABELS[c]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Resolution — gated tiers stay visible but are locked for non-supporters */}
-          <Select
-            value={resolution}
-            onValueChange={(v) => {
-              if (!v) return
-              const opt = resolutions.find((r) => r.value === v)
-              if (opt?.supporter && !supporter) {
-                onUpsell?.()
-                return
-              }
-              setResolution(v)
-            }}
-          >
-            <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-28">
-              <SelectValue>{resolutionLabel(resolutions.find((r) => r.value === resolution) ?? resolutions[0])}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {resolutions.map((r) => {
-                const locked = r.supporter && !supporter
-                return (
-                  <SelectItem key={r.value} value={r.value} disabled={locked}>
-                    <span className="flex items-center gap-2">
-                      {resolutionLabel(r)}
-                      {r.supporter && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                          <Lock className="size-2.5" /> {m.form.supporterOnly}
-                        </span>
-                      )}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        </>
+        <VideoQualityMenu
+          container={container}
+          resolution={resolution}
+          supporter={supporter}
+          onChange={(c, r) => {
+            setContainer(c)
+            setResolution(r)
+          }}
+          onUpsell={onUpsell}
+        />
       ) : (
         /* Audio format + quality (single combined select) */
         <Select
@@ -214,7 +277,7 @@ export function DownloadForm({
             setAudioOption(v)
           }}
         >
-          <SelectTrigger className="h-10 flex-1 rounded-full px-4 sm:min-w-40">
+          <SelectTrigger className="h-10 min-w-0 flex-1 rounded-full px-4 sm:min-w-44">
             <SelectValue>{audioLabel(audioOption)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -224,11 +287,7 @@ export function DownloadForm({
                 <SelectItem key={o.value} value={o.value} disabled={locked}>
                   <span className="flex items-center gap-2">
                     {audioLabel(o.value)}
-                    {o.supporter && (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                        <Lock className="size-2.5" /> {m.form.supporterOnly}
-                      </span>
-                    )}
+                    {o.supporter && <Crown className="size-3 text-amber-500" />}
                   </span>
                 </SelectItem>
               )
