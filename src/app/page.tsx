@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
@@ -336,7 +337,22 @@ export default function Home() {
                 {agreed && <Check className="size-3" />}
               </button>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                {m.disclaimer.text}
+                {(() => {
+                  const [before, after] = m.disclaimer.text.split('{terms}')
+                  if (after === undefined) return m.disclaimer.text
+                  return (
+                    <>
+                      {before}
+                      <Link
+                        href="/copyright"
+                        className="font-medium text-foreground underline underline-offset-2 hover:text-foreground/80"
+                      >
+                        {m.disclaimer.terms}
+                      </Link>
+                      {after}
+                    </>
+                  )
+                })()}
               </p>
             </div>
 

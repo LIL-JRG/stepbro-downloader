@@ -40,7 +40,8 @@ export const translations: Record<string, DeepPartial<Messages>> = {
     },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {
-      text: 'Confirmo que he leído y acepto los términos de derechos de autor y no descargaré contenido con derechos de autor.',
+      text: 'Confirmo que he leído y acepto los {terms} y no descargaré contenido con derechos de autor.',
+      terms: 'términos de derechos de autor',
       report: 'Reportar contenido con derechos de autor',
       agree: 'Acepto',
     },

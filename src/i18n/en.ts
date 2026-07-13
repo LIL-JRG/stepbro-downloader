@@ -46,7 +46,9 @@ export const en = {
     loading: 'Loading preview…',
   },
   disclaimer: {
-    text: 'I confirm I have read and agree to the copyright terms and will not download copyrighted content.',
+    // {terms} is replaced by a link to /copyright when rendered.
+    text: 'I confirm I have read and agree to the {terms} and will not download copyrighted content.',
+    terms: 'copyright terms',
     report: 'Report copyrighted content',
     agree: 'I agree',
   },
