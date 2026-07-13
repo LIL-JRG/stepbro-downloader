@@ -40,6 +40,10 @@ export default function Home() {
   const { m } = useI18n()
   const [url, setUrl] = useState('')
   const [videoData, setVideoData] = useState<VideoData | null>(null)
+  // The exact input URL `videoData` was fetched for, so we never treat a stale
+  // preview (from the previous link, while the new one is still loading) as
+  // current — that caused downloads to grab the previous video.
+  const [videoDataUrl, setVideoDataUrl] = useState('')
   const [isFetching, setIsFetching] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [agreed, setAgreed] = useState(true)
@@ -147,6 +151,7 @@ export default function Home() {
     const timer = setTimeout(async () => {
       if (!looksLikeUrl(trimmed)) {
         setVideoData(null)
+        setVideoDataUrl('')
         setIsFetching(false)
         return
       }
@@ -161,8 +166,12 @@ export default function Home() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Could not load video')
         setVideoData(data)
+        setVideoDataUrl(trimmed)
       } catch (err) {
-        if ((err as Error).name !== 'AbortError') setVideoData(null)
+        if ((err as Error).name !== 'AbortError') {
+          setVideoData(null)
+          setVideoDataUrl('')
+        }
       } finally {
         setIsFetching(false)
       }
@@ -173,9 +182,14 @@ export default function Home() {
     }
   }, [url])
 
-  // Download uses the canonical webpage_url when we have a preview, else the raw input.
-  const targetUrl = videoData?.webpage_url ?? url.trim()
-  const tooLong = maxDuration > 0 && !!videoData?.duration && videoData.duration > maxDuration
+  // Trust the preview only when it belongs to the current input; otherwise it's
+  // stale (previous link still showing while the new one loads).
+  const inputUrl = url.trim()
+  const currentVideo = videoData && videoDataUrl === inputUrl ? videoData : null
+  // Download the canonical webpage_url when the preview is current, else the raw
+  // input — never the previous video's URL.
+  const targetUrl = currentVideo?.webpage_url ?? inputUrl
+  const tooLong = maxDuration > 0 && !!currentVideo?.duration && currentVideo.duration > maxDuration
 
   function cancelDownload() {
     downloadAbort.current?.abort()
