@@ -193,7 +193,8 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `ADMIN_TOKEN` | *(disabled)* | Enables the `/admin` page (DMCA review + supporter keys); sent as `Authorization: Bearer <token>`. Reports only block a video once approved here |
 
 | `KOFI_VERIFICATION_TOKEN` | *(disabled)* | Enables the Ko-fi payment webhook at `/api/kofi` (set it to the token shown at ko-fi.com/manage/webhooks) |
-| `KOFI_PRICE_30D` / `KOFI_PRICE_90D` / `KOFI_PRICE_LIFETIME` | `5` / `10` / `25` | Payment thresholds (in your Ko-fi currency) mapping a payment to a license tier; anything below `KOFI_PRICE_30D` grants 7-Day |
+| `KOFI_ITEM_7D` / `KOFI_ITEM_30D` / `KOFI_ITEM_90D` / `KOFI_ITEM_LIFETIME` | *(this shop's items)* | `direct_link_code` of each Ko-fi shop item (the code in its `ko-fi.com/s/<code>` link) mapping a Shop Order to its license tier |
+| `KOFI_PRICE_30D` / `KOFI_PRICE_90D` / `KOFI_PRICE_LIFETIME` | `14.99` / `24.99` / `39.99` | Amount fallback (for plain donations without shop items); anything below `KOFI_PRICE_30D` grants 7-Day |
 | `EMAIL_LOOKUP_PER_HOUR` | `5` | Max license activations/recoveries by payment email per IP per hour (anti-guessing) |
 
 > **Supporter keys:** from `/admin` you can generate keys (`SB-XXXX-XXXX-XXXX`) for

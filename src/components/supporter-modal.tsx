@@ -10,13 +10,20 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/provider'
 import { playCue } from '@/lib/sound'
 
+export interface SupportTier {
+  plan: '7d' | '30d' | '90d' | 'lifetime'
+  price: string
+  url: string
+}
+
 interface SupporterWidgetProps {
   supporter: boolean
   supporterKey: string | null
   /** Active plan details (from /api/limit) for the status view. */
   plan?: string | null
   expiresAt?: number | null
-  donateUrl: string
+  /** Ko-fi shop items, one per license tier. */
+  tiers: SupportTier[]
   /** Free-tier numbers shown in the comparison table. */
   freeLimit: number
   maxDuration: number
@@ -90,7 +97,7 @@ function SupporterModal({
   supporterKey,
   plan,
   expiresAt,
-  donateUrl,
+  tiers,
   freeLimit,
   maxDuration,
   onApply,
@@ -280,17 +287,42 @@ function SupporterModal({
               ))}
             </div>
 
-            <a
-              href={donateUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setView('activate')}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-amber-400 font-semibold text-amber-950 transition-colors hover:bg-amber-300"
-            >
-              <Heart className="size-4" /> {m.supporter.become}
-            </a>
-
-            <p className="text-center text-[11px] text-muted-foreground">{m.supporter.tiers}</p>
+            {/* One button per Ko-fi shop item — clicking opens the item in a new
+                tab and flips the modal to the activation view. */}
+            <div className="space-y-2">
+              {tiers.map((t) => {
+                const label =
+                  t.plan === '7d'
+                    ? m.supporter.plan7d
+                    : t.plan === '30d'
+                      ? m.supporter.plan30d
+                      : t.plan === '90d'
+                        ? m.supporter.plan90d
+                        : m.supporter.planLifetime
+                const highlight = t.plan === 'lifetime'
+                return (
+                  <a
+                    key={t.plan}
+                    href={t.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setView('activate')}
+                    className={cn(
+                      'flex h-11 w-full items-center justify-between rounded-full px-5 text-sm font-semibold transition-colors',
+                      highlight
+                        ? 'bg-amber-400 text-amber-950 hover:bg-amber-300'
+                        : 'bg-muted text-foreground hover:bg-muted/70'
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      {highlight && <Heart className="size-4" />}
+                      {label}
+                    </span>
+                    <span className="tabular-nums">{t.price}</span>
+                  </a>
+                )
+              })}
+            </div>
 
             <p className="text-center text-xs">
               <button

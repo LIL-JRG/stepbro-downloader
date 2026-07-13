@@ -19,8 +19,13 @@ import { useI18n } from '@/i18n/provider'
 import { initSound, playCue } from '@/lib/sound'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
 
-// Where the Donate button points — change to your own sponsor/donation page.
-const DONATE_URL = 'https://ko-fi.com/jorgerasgado'
+// Ko-fi shop items, one per license tier (prices shown in the Supporter modal).
+const SUPPORT_TIERS = [
+  { plan: '7d', price: '$9.99', url: 'https://ko-fi.com/s/6256f77fd5' },
+  { plan: '30d', price: '$14.99', url: 'https://ko-fi.com/s/1b20036466' },
+  { plan: '90d', price: '$24.99', url: 'https://ko-fi.com/s/b1c568c4bb' },
+  { plan: 'lifetime', price: '$39.99', url: 'https://ko-fi.com/s/f30c359628' },
+] as const
 const CONSENT_KEY = 'stepbro-consent'
 const SUPPORTER_KEY = 'stepbro-key'
 
@@ -268,7 +273,7 @@ export default function Home() {
               supporterKey={supporterKey}
               plan={supporterInfo.plan}
               expiresAt={supporterInfo.expiresAt}
-              donateUrl={DONATE_URL}
+              tiers={[...SUPPORT_TIERS]}
               freeLimit={usage?.limit ?? 5}
               maxDuration={supporter ? 10800 : maxDuration}
               onApply={applySupporterKey}
