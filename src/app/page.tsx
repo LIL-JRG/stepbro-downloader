@@ -276,7 +276,7 @@ export default function Home() {
               expiresAt={supporterInfo.expiresAt}
               tiers={[...SUPPORT_TIERS]}
               freeLimit={usage?.limit ?? 5}
-              maxDuration={supporter ? 10800 : maxDuration}
+              maxDuration={supporter ? 3600 : maxDuration}
               onApply={applySupporterKey}
               onRemove={() => applySupporterKey(null)}
               open={supporterOpen}

@@ -20,7 +20,7 @@ import {
   VIDEO_CONTAINERS,
   CONTAINER_LABELS,
   DEFAULT_CONTAINER,
-  DEFAULT_RESOLUTION,
+  defaultResolution,
   resolutionsFor,
   findAudioOption,
 } from '@/lib/formats'
@@ -65,7 +65,6 @@ function VideoQualityMenu({
   onChange: (container: string, resolution: string) => void
   onUpsell?: () => void
 }) {
-  const { m } = useI18n()
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(container)
   const ref = useRef<HTMLDivElement>(null)
@@ -79,11 +78,8 @@ function VideoQualityMenu({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const resLabel = (value: string, label: string) => (value === 'best' ? m.form.auto : label)
-  const triggerLabel = `${CONTAINER_LABELS[container]} · ${resLabel(
-    resolution,
-    resolutionsFor(container).find((r) => r.value === resolution)?.label ?? ''
-  )}`
+  const currentLabel = resolutionsFor(container).find((r) => r.value === resolution)?.label ?? ''
+  const triggerLabel = `${CONTAINER_LABELS[container]} · ${currentLabel}`
 
   return (
     <div ref={ref} className="relative min-w-0 flex-1 sm:min-w-44">
@@ -138,7 +134,7 @@ function VideoQualityMenu({
                         )}
                       >
                         <span>
-                          {CONTAINER_LABELS[c]} · {resLabel(r.value, r.label)}
+                          {CONTAINER_LABELS[c]} · {r.label}
                         </span>
                         {r.supporter && <Crown className="size-3 shrink-0 text-amber-500" />}
                         {selected && <Check className="ml-auto size-3.5 shrink-0" />}
@@ -165,9 +161,12 @@ export function DownloadForm({
   const { m } = useI18n()
   const [mode, setMode] = useState<'mp4' | 'mp3'>('mp4')
   const [container, setContainer] = useState<string>(DEFAULT_CONTAINER)
-  const [resolution, setResolution] = useState(DEFAULT_RESOLUTION)
+  const [resolution, setResolution] = useState(() => defaultResolution(supporter))
   const [audioOption, setAudioOption] = useState(DEFAULT_AUDIO)
   const [hydrated, setHydrated] = useState(false)
+  // Whether the user has explicitly picked a resolution (or restored a stored
+  // one). Until then we keep the default at the highest tier for their status.
+  const pickedResolution = useRef(false)
 
   // Restore the last-used choices (deferred so it doesn't fire as a synchronous
   // setState in the effect body, and stays hydration-safe).
@@ -183,7 +182,11 @@ export function DownloadForm({
       if (stored) {
         if (stored.mode === 'mp3' || stored.mode === 'mp4') setMode(stored.mode)
         if (VIDEO_CONTAINERS.includes(stored.container as never)) setContainer(stored.container as string)
-        if (typeof stored.resolution === 'string') setResolution(stored.resolution)
+        // Only honour a stored resolution that still exists (Auto was removed).
+        if (typeof stored.resolution === 'string' && resolutionsFor(DEFAULT_CONTAINER).concat(resolutionsFor((stored.container as string) ?? DEFAULT_CONTAINER)).some((r) => r.value === stored!.resolution)) {
+          setResolution(stored.resolution as string)
+          pickedResolution.current = true
+        }
         if (findAudioOption(stored.audioOption as string)) setAudioOption(stored.audioOption as string)
       }
       setHydrated(true)
@@ -199,12 +202,14 @@ export function DownloadForm({
     )
   }, [hydrated, mode, container, resolution, audioOption])
 
-  // Keep the resolution valid for the current container (e.g. 1080p Premium only
-  // exists on MP4), and never leave a locked pick selected for a non-supporter.
+  // Default to the highest tier for the user's status until they pick one, and
+  // keep the resolution valid for the current container (1080p Premium is MP4
+  // only) and never leave a locked pick selected for a non-supporter.
   useEffect(() => {
     const current = resolutionsFor(container).find((r) => r.value === resolution)
-    if (!current || (current.supporter && !supporter)) {
-      queueMicrotask(() => setResolution(DEFAULT_RESOLUTION))
+    const invalid = !current || (current.supporter && !supporter)
+    if (invalid || !pickedResolution.current) {
+      queueMicrotask(() => setResolution(defaultResolution(supporter)))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [container, supporter])
@@ -258,6 +263,7 @@ export function DownloadForm({
           resolution={resolution}
           supporter={supporter}
           onChange={(c, r) => {
+            pickedResolution.current = true
             setContainer(c)
             setResolution(r)
           }}

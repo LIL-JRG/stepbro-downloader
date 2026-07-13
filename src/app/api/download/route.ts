@@ -17,7 +17,7 @@ import {
   FREE_MAX_HEIGHT,
   DEFAULT_AUDIO,
   DEFAULT_CONTAINER,
-  DEFAULT_RESOLUTION,
+  defaultResolution,
   VIDEO_CONTAINERS,
 } from '@/lib/formats'
 
@@ -50,16 +50,13 @@ function buildArgs(
       : DEFAULT_CONTAINER
     const quality = resolutionsFor(container).some((r) => r.value === opts.quality)
       ? (opts.quality as string)
-      : DEFAULT_RESOLUTION
+      : defaultResolution(supporter)
     const mergeFormat = container
     const premium = quality === '1080premium'
 
-    // Effective height ceiling. "Auto" is the real best for supporters, but a
-    // non-supporter is always clamped to the free cap (1080p) regardless of pick.
-    let height: number
-    if (premium) height = 1080
-    else if (quality === 'best') height = supporter ? Infinity : FREE_MAX_HEIGHT
-    else height = Number(quality)
+    // Effective height ceiling. A non-supporter is always clamped to the free
+    // cap (1080p) regardless of pick.
+    let height = premium ? 1080 : Number(quality)
     if (!supporter) height = Math.min(height, FREE_MAX_HEIGHT)
     const heightFilter = Number.isFinite(height) ? `[height<=${height}]` : ''
     // The 1080p "Premium" tier prefers YouTube's high-bitrate variant.
@@ -138,7 +135,7 @@ export async function POST(request: NextRequest) {
   if (!supporter) {
     const gated = opts.audioOnly
       ? audioRequiresSupporter(opts.audioOption)
-      : videoRequiresSupporter(opts.container ?? DEFAULT_CONTAINER, opts.quality ?? DEFAULT_RESOLUTION)
+      : videoRequiresSupporter(opts.container ?? DEFAULT_CONTAINER, opts.quality ?? defaultResolution(false))
     if (gated) {
       return Response.json(
         { error: 'This quality requires a supporter license.' },

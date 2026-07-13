@@ -19,7 +19,7 @@ interface Entry {
 export const DAILY_LIMIT = Math.max(1, Number(process.env.DAILY_DOWNLOAD_LIMIT ?? 5))
 
 /** Max allowed video duration in seconds (0 = unlimited). Anti-abuse guard. */
-export const MAX_VIDEO_DURATION = Math.max(0, Number(process.env.MAX_VIDEO_DURATION ?? 10800))
+export const MAX_VIDEO_DURATION = Math.max(0, Number(process.env.MAX_VIDEO_DURATION ?? 3600))
 
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
 const STORE_FILE = join(DATA_DIR, 'rate-limit.json')

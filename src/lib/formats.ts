@@ -72,13 +72,12 @@ export interface ResolutionOption {
 }
 
 /**
- * Resolutions offered for a container. 4K is supporter-only everywhere; 2K is
- * supporter-only except on WebM; MP4 additionally offers a supporter-only
- * "1080p Premium" (high-bitrate) tier.
+ * Resolutions offered for a container, highest first. 4K is supporter-only
+ * everywhere; 2K is supporter-only except on WebM; MP4 additionally offers a
+ * supporter-only "1080p Premium" (high-bitrate) tier.
  */
 export function resolutionsFor(container: string): ResolutionOption[] {
   const list: ResolutionOption[] = [
-    { value: 'best', label: 'Auto', supporter: false },
     { value: '2160', label: '4K', supporter: true },
     { value: '1440', label: '2K', supporter: container !== 'webm' },
   ]
@@ -96,7 +95,11 @@ export function resolutionsFor(container: string): ResolutionOption[] {
 }
 
 export const DEFAULT_CONTAINER: VideoContainer = 'mp4'
-export const DEFAULT_RESOLUTION = 'best'
+
+/** Highest resolution a user may pick by default: 4K for supporters, 1080p free. */
+export function defaultResolution(supporter: boolean): string {
+  return supporter ? '2160' : '1080'
+}
 
 /** Highest resolution (in px) a non-supporter may download. */
 export const FREE_MAX_HEIGHT = 1080

@@ -15,9 +15,7 @@ export const en = {
   },
   form: {
     best: 'Best',
-    auto: 'Auto',
     mp3: 'MP3',
-    supporterOnly: 'Supporter',
     download: 'Download',
     downloading: 'Downloading…',
     cancel: 'Cancel',
