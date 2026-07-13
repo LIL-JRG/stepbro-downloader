@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server'
 import { registerTempFile } from '@/lib/temp-store'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 import { getClientIp, peekLimit, consumeLimit, MAX_VIDEO_DURATION } from '@/lib/rate-limit'
+import { isBlocked } from '@/lib/blocklist'
 
 export const runtime = 'nodejs'
 
@@ -86,6 +87,14 @@ export async function POST(request: NextRequest) {
 
   if (!opts.url || typeof opts.url !== 'string') {
     return Response.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  // Refuse content removed at a rights holder's request (DMCA).
+  if (isBlocked(opts.url)) {
+    return Response.json(
+      { error: 'This video has been removed at the request of the rights holder.' },
+      { status: 403 }
+    )
   }
 
   // Enforce the per-IP daily limit up front (a slot is only consumed on success).

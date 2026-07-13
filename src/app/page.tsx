@@ -341,7 +341,7 @@ export default function Home() {
             </div>
 
             <p className="mt-2.5 text-center text-xs text-muted-foreground">
-              <a href="#" className="inline-flex items-center gap-1 hover:text-foreground">
+              <a href="/report" className="inline-flex items-center gap-1 hover:text-foreground">
                 <Flag className="size-3" /> {m.disclaimer.report}
               </a>
             </p>
@@ -411,6 +411,12 @@ export default function Home() {
 
         <InfoSections />
       </main>
+
+      <footer className="px-4 pb-8 text-center text-xs text-white/70">
+        <a href="/copyright" className="hover:text-white">Copyright disclaimer</a>
+        <span className="mx-2">·</span>
+        <a href="/report" className="hover:text-white">Report DMCA</a>
+      </footer>
     </div>
   )
 }

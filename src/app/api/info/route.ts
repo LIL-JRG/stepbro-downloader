@@ -2,6 +2,7 @@ import { spawn } from 'child_process'
 import type { NextRequest } from 'next/server'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 import { getClientIp, allowInfoRequest } from '@/lib/rate-limit'
+import { isBlocked } from '@/lib/blocklist'
 
 export const runtime = 'nodejs'
 
@@ -29,6 +30,13 @@ export async function POST(request: NextRequest) {
 
   if (!url || typeof url !== 'string') {
     return Response.json({ error: 'URL is required' }, { status: 400 })
+  }
+
+  if (isBlocked(url)) {
+    return Response.json(
+      { error: 'This video has been removed at the request of the rights holder.' },
+      { status: 403 }
+    )
   }
 
   // Per-IP throttle so the (yt-dlp-spawning) endpoint can't be hammered.
