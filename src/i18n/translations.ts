@@ -38,6 +38,14 @@ export const translations: Record<string, DeepPartial<Messages>> = {
       another: 'Descargar otro',
       auto: 'auto',
     },
+    supporter: {
+      have: '¿Tienes una clave de supporter?',
+      placeholder: 'SB-XXXX-XXXX-XXXX',
+      apply: 'Aplicar',
+      active: 'Supporter — descargas ilimitadas',
+      invalid: 'Clave inválida o revocada',
+      remove: 'Quitar',
+    },
     preview: { loading: 'Cargando vista previa…' },
     disclaimer: {
       text: 'Confirmo que he leído y acepto los {terms} y no descargaré contenido con derechos de autor.',

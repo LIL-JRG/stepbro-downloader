@@ -8,6 +8,7 @@ import { registerTempFile } from '@/lib/temp-store'
 import { commonYtdlpArgs, ytdlpBin } from '@/lib/ytdlp'
 import { getClientIp, peekLimit, consumeLimit, MAX_VIDEO_DURATION } from '@/lib/rate-limit'
 import { isBlocked } from '@/lib/blocklist'
+import { isValidKey } from '@/lib/supporter'
 
 export const runtime = 'nodejs'
 
@@ -20,7 +21,12 @@ interface DownloadOptions {
   audioQuality?: string
 }
 
-function buildArgs(opts: DownloadOptions, outDir: string, shared: string[]): string[] {
+function buildArgs(
+  opts: DownloadOptions,
+  outDir: string,
+  shared: string[],
+  supporter: boolean
+): string[] {
   const args: string[] = []
   args.push('-o', join(outDir, '%(title).100s [%(id)s].%(ext)s'), '--restrict-filenames')
 
@@ -71,7 +77,10 @@ function buildArgs(opts: DownloadOptions, outDir: string, shared: string[]): str
   if (ffmpegBin) args.push('--ffmpeg-location', ffmpegBin)
 
   // Anti-abuse backstop: refuse videos longer than the cap (client gates too).
-  if (MAX_VIDEO_DURATION > 0) args.push('--match-filters', `duration<=${MAX_VIDEO_DURATION}`)
+  // Supporters are exempt.
+  if (!supporter && MAX_VIDEO_DURATION > 0) {
+    args.push('--match-filters', `duration<=${MAX_VIDEO_DURATION}`)
+  }
 
   args.push(...shared)
   args.push('--newline', '--no-playlist', '--force-overwrites', opts.url)
@@ -97,14 +106,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // A valid supporter key (validated server-side on every request) bypasses the
+  // daily limit and the duration cap. DMCA blocks still apply to everyone.
+  const supporter = isValidKey(request.headers.get('x-supporter-key'))
+
   // Enforce the per-IP daily limit up front (a slot is only consumed on success).
   const clientIp = getClientIp(request)
-  const status = peekLimit(clientIp)
-  if (status.remaining <= 0) {
-    return Response.json(
-      { error: 'Daily download limit reached. Please try again tomorrow.', limit: status.limit, remaining: 0 },
-      { status: 429 }
-    )
+  if (!supporter) {
+    const status = peekLimit(clientIp)
+    if (status.remaining <= 0) {
+      return Response.json(
+        { error: 'Daily download limit reached. Please try again tomorrow.', limit: status.limit, remaining: 0 },
+        { status: 429 }
+      )
+    }
   }
 
   const token = uuid()
@@ -115,7 +130,7 @@ export async function POST(request: NextRequest) {
     /\[download\]\s+([\d.]+)%\s+of\s+~?([\d.]+\S*)\s+at\s+([\d.]+\S*)\s+ETA\s+(\S+)/
 
   const shared = await commonYtdlpArgs()
-  const args = buildArgs(opts, tempDir, shared)
+  const args = buildArgs(opts, tempDir, shared, supporter)
 
   let proc: ReturnType<typeof spawn> | null = null
   let registered = false
@@ -174,13 +189,13 @@ export async function POST(request: NextRequest) {
 
             registerTempFile(token, join(tempDir, largest.f), largest.f)
             registered = true
-            const usage = consumeLimit(clientIp)
+            // Supporters don't consume (or report) daily-limit slots.
+            const usage = supporter ? null : consumeLimit(clientIp)
             sendEvent(controller, encoder, {
               type: 'ready',
               token,
               filename: largest.f,
-              remaining: usage.remaining,
-              limit: usage.limit,
+              ...(usage ? { remaining: usage.remaining, limit: usage.limit } : {}),
             })
           } catch (err) {
             sendEvent(controller, encoder, {

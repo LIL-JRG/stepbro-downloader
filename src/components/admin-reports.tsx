@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { Check, X, Loader2, ExternalLink } from 'lucide-react'
+import { Check, X, Loader2, ExternalLink, Copy, KeyRound, Plus } from 'lucide-react'
 
 interface Report {
   id: string
@@ -16,21 +16,36 @@ interface Report {
   status: 'pending' | 'approved' | 'rejected'
 }
 
+interface SupporterKey {
+  code: string
+  note: string
+  ts: number
+  revoked: boolean
+}
+
 const TOKEN_KEY = 'stepbro-admin'
 
 export function AdminReports() {
   const [token, setToken] = useState('')
   const [authed, setAuthed] = useState(false)
   const [reports, setReports] = useState<Report[]>([])
+  const [keys, setKeys] = useState<SupporterKey[]>([])
+  const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async (tk: string) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/reports', { headers: { Authorization: `Bearer ${tk}` } })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to load')
-      setReports(data.reports ?? [])
+      const auth = { Authorization: `Bearer ${tk}` }
+      const [repRes, keyRes] = await Promise.all([
+        fetch('/api/admin/reports', { headers: auth }),
+        fetch('/api/admin/keys', { headers: auth }),
+      ])
+      const repData = await repRes.json().catch(() => ({}))
+      if (!repRes.ok) throw new Error(repData.error || 'Failed to load')
+      const keyData = await keyRes.json().catch(() => ({}))
+      setReports(repData.reports ?? [])
+      setKeys(keyData.keys ?? [])
       setToken(tk)
       setAuthed(true)
       sessionStorage.setItem(TOKEN_KEY, tk)
@@ -61,6 +76,31 @@ export function AdminReports() {
       const data = await res.json().catch(() => ({}))
       toast.error(data.error || 'Action failed')
     }
+  }
+
+  async function keyAction(body: { action: string; note?: string; code?: string }) {
+    const res = await fetch('/api/admin/keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(data.error || 'Action failed')
+      return
+    }
+    if (body.action === 'create' && data.key?.code) {
+      setNote('')
+      toast.success(`Key created: ${data.key.code}`)
+    }
+    load(token)
+  }
+
+  function copyKey(code: string) {
+    navigator.clipboard
+      .writeText(code)
+      .then(() => toast.success('Key copied'))
+      .catch(() => toast.error('Clipboard blocked'))
   }
 
   if (!authed) {
@@ -151,6 +191,75 @@ export function AdminReports() {
           </div>
         </section>
       )}
+
+      <section className="border-t border-border pt-6">
+        <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+          <KeyRound className="size-4" /> Supporter keys ({keys.length})
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A valid key unlocks unlimited downloads and lifts the duration cap. Generate one per
+          supporter and revoke it anytime.
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            keyAction({ action: 'create', note })
+          }}
+          className="mt-3 flex gap-2"
+        >
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Note (e.g. Ko-fi — Juan)"
+            className="h-9 rounded-xl"
+          />
+          <Button type="submit" size="sm" className="h-9 shrink-0 gap-1.5 rounded-full px-4">
+            <Plus className="size-3.5" /> Generate
+          </Button>
+        </form>
+
+        <div className="mt-3 space-y-2">
+          {keys.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No keys yet.</p>
+          ) : (
+            keys.map((k) => (
+              <div
+                key={k.code}
+                className="flex flex-wrap items-center gap-2 rounded-2xl bg-muted/60 p-3 text-sm"
+              >
+                <code className={k.revoked ? 'font-mono line-through opacity-50' : 'font-mono'}>
+                  {k.code}
+                </code>
+                <span className="text-xs text-muted-foreground">
+                  {k.note && <>{k.note} · </>}
+                  {new Date(k.ts).toLocaleDateString()}
+                  {k.revoked && ' · REVOKED'}
+                </span>
+                <span className="ml-auto flex gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 rounded-full px-2.5 text-xs"
+                    onClick={() => copyKey(k.code)}
+                  >
+                    <Copy className="size-3" /> Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 rounded-full px-2.5 text-xs"
+                    onClick={() => keyAction({ action: k.revoked ? 'restore' : 'revoke', code: k.code })}
+                  >
+                    {k.revoked ? <Check className="size-3" /> : <X className="size-3" />}
+                    {k.revoked ? 'Restore' : 'Revoke'}
+                  </Button>
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </div>
   )
 }

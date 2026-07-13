@@ -190,7 +190,13 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `DATA_DIR` | `/data` (Docker) | Where per-IP rate-limit state is persisted; mount a volume here to keep it across redeploys |
 | `INFO_RATE_PER_MIN` | `30` | Max `/api/info` (preview) requests per IP per minute |
 | `YTDLP_AUTO_UPDATE` | `true` | Update yt-dlp + bgutil plugin on container start |
-| `ADMIN_TOKEN` | *(disabled)* | Enables the `/admin` DMCA review page; sent as `Authorization: Bearer <token>`. Reports only block a video once approved here |
+| `ADMIN_TOKEN` | *(disabled)* | Enables the `/admin` page (DMCA review + supporter keys); sent as `Authorization: Bearer <token>`. Reports only block a video once approved here |
+
+> **Supporter keys:** from `/admin` you can generate keys (`SB-XXXX-XXXX-XXXX`) for
+> supporters. Entering a key on the home page ("Have a supporter key?") unlocks
+> unlimited downloads and lifts the duration cap. Keys are validated server-side on
+> every request and can be revoked/restored anytime; they persist in
+> `DATA_DIR/supporters.json`.
 | `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
 
 > **Local development on a residential IP** needs none of these — yt-dlp's default web

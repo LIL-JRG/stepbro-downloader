@@ -14,6 +14,7 @@ import { ResultPanel } from '@/components/downloader/ResultPanel'
 import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
 import { DonateButton } from '@/components/donate-button'
+import { SupporterEntry } from '@/components/supporter-entry'
 import { useI18n } from '@/i18n/provider'
 import { initSound, playCue } from '@/lib/sound'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
@@ -21,6 +22,7 @@ import { Loader2, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
 // Where the Donate button points — change to your own sponsor/donation page.
 const DONATE_URL = 'https://ko-fi.com/jorgerasgado'
 const CONSENT_KEY = 'stepbro-consent'
+const SUPPORTER_KEY = 'stepbro-key'
 
 function looksLikeUrl(s: string): boolean {
   return /^https?:\/\/\S+\.\S+/i.test(s.trim())
@@ -37,6 +39,8 @@ export default function Home() {
   const [maxDuration, setMaxDuration] = useState(0)
   const [progress, setProgress] = useState<{ percent: number; speed?: string; eta?: string } | null>(null)
   const [result, setResult] = useState<{ token: string; filename: string } | null>(null)
+  const [supporterKey, setSupporterKey] = useState<string | null>(null)
+  const [supporter, setSupporter] = useState(false)
   const downloadAbort = useRef<AbortController | null>(null)
 
   // Load interaction sounds (cuelume) once on the client.
@@ -44,13 +48,35 @@ export default function Home() {
     initSound()
   }, [])
 
+  // Restore a saved supporter key (deferred → hydration-safe).
+  useEffect(() => {
+    const stored = localStorage.getItem(SUPPORTER_KEY)
+    if (stored) queueMicrotask(() => setSupporterKey(stored))
+  }, [])
+
+  function applySupporterKey(key: string | null) {
+    setSupporterKey(key)
+    setSupporter(false) // /api/limit below confirms the perks server-side
+    if (key) localStorage.setItem(SUPPORTER_KEY, key)
+    else localStorage.removeItem(SUPPORTER_KEY)
+  }
+
   // Fetch the current daily download allowance (server is the source of truth).
+  // A valid supporter key flips the response to unlimited.
   useEffect(() => {
     let active = true
-    fetch('/api/limit')
+    fetch('/api/limit', {
+      headers: supporterKey ? { 'x-supporter-key': supporterKey } : undefined,
+    })
       .then((r) => r.json())
       .then((d) => {
-        if (active && typeof d?.limit === 'number') {
+        if (!active) return
+        if (d?.supporter) {
+          setSupporter(true)
+          setUsage(null)
+          setMaxDuration(0)
+        } else if (typeof d?.limit === 'number') {
+          setSupporter(false)
           setUsage({ limit: d.limit, remaining: d.remaining })
           setMaxDuration(typeof d.maxDuration === 'number' ? d.maxDuration : 0)
         }
@@ -59,7 +85,7 @@ export default function Home() {
     return () => {
       active = false
     }
-  }, [])
+  }, [supporterKey])
 
   // Remember the copyright consent across visits (deferred restore for hydration
   // safety + to avoid a synchronous setState in the effect body).
@@ -139,7 +165,7 @@ export default function Home() {
       toast.error(m.toast.needUrl)
       return
     }
-    if (usage && usage.remaining <= 0) {
+    if (!supporter && usage && usage.remaining <= 0) {
       toast.error(m.toast.limit)
       return
     }
@@ -152,7 +178,10 @@ export default function Home() {
 
     fetch('/api/download', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(supporterKey ? { 'x-supporter-key': supporterKey } : {}),
+      },
       body: JSON.stringify(config),
       signal: controller.signal,
     }).then(async (res) => {
@@ -279,7 +308,7 @@ export default function Home() {
                 targetUrl={targetUrl}
                 onDownload={handleDownload}
                 isDownloading={isDownloading}
-                blocked={!agreed || tooLong || (usage !== null && usage.remaining <= 0)}
+                blocked={!agreed || (!supporter && (tooLong || (usage !== null && usage.remaining <= 0)))}
               />
 
               {isDownloading ? (
@@ -302,6 +331,17 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
+              ) : supporter ? (
+                <p className="mt-2.5 text-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  ★ {m.supporter.active}
+                  <button
+                    type="button"
+                    onClick={() => applySupporterKey(null)}
+                    className="ml-2 font-normal text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    {m.supporter.remove}
+                  </button>
+                </p>
               ) : tooLong ? (
                 <p className="mt-2.5 text-center text-xs font-medium text-destructive">
                   {m.usage.tooLong.replace('{hours}', String(Math.floor(maxDuration / 3600)))}
@@ -320,6 +360,8 @@ export default function Home() {
                     : m.usage.reached}
                 </p>
               ) : null}
+
+              {!supporter && !isDownloading && <SupporterEntry onApply={applySupporterKey} />}
             </div>
 
             {/* Disclaimer */}

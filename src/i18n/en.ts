@@ -42,6 +42,14 @@ export const en = {
     another: 'Download another',
     auto: 'auto',
   },
+  supporter: {
+    have: 'Have a supporter key?',
+    placeholder: 'SB-XXXX-XXXX-XXXX',
+    apply: 'Apply',
+    active: 'Supporter — unlimited downloads',
+    invalid: 'Invalid or revoked key',
+    remove: 'Remove',
+  },
   preview: {
     loading: 'Loading preview…',
   },
