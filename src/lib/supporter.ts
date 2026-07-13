@@ -15,6 +15,8 @@ export interface SupporterKey {
   note: string
   ts: number
   revoked: boolean
+  /** Payment email (set for keys granted via the Ko-fi webhook). */
+  email?: string
 }
 
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
@@ -75,4 +77,24 @@ export function isValidKey(code: string | null | undefined): boolean {
   if (!code) return false
   const key = keys.find((k) => k.code === normalize(code))
   return !!key && !key.revoked
+}
+
+/** Active key for a payment email (used for activation and key recovery). */
+export function findKeyByEmail(email: string): SupporterKey | null {
+  const needle = email.trim().toLowerCase()
+  if (!needle) return null
+  return keys.find((k) => !k.revoked && k.email?.toLowerCase() === needle) ?? null
+}
+
+/**
+ * Grant a key to a payment email (Ko-fi webhook). Idempotent: returns the
+ * existing active key for that email if one exists.
+ */
+export function grantKeyForEmail(email: string, note: string): SupporterKey {
+  const existing = findKeyByEmail(email)
+  if (existing) return existing
+  const key = createKey(note)
+  key.email = email.trim().toLowerCase()
+  persist()
+  return key
 }

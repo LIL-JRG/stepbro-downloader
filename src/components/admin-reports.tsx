@@ -21,6 +21,7 @@ interface SupporterKey {
   note: string
   ts: number
   revoked: boolean
+  email?: string
 }
 
 const TOKEN_KEY = 'stepbro-admin'
@@ -232,6 +233,7 @@ export function AdminReports() {
                   {k.code}
                 </code>
                 <span className="text-xs text-muted-foreground">
+                  {k.email && <>{k.email} · </>}
                   {k.note && <>{k.note} · </>}
                   {new Date(k.ts).toLocaleDateString()}
                   {k.revoked && ' · REVOKED'}

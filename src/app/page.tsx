@@ -15,6 +15,7 @@ import { InfoSections } from '@/components/InfoSections'
 import { LanguageSelector } from '@/components/language-selector'
 import { DonateButton } from '@/components/donate-button'
 import { SupporterEntry } from '@/components/supporter-entry'
+import { SupporterWidget } from '@/components/supporter-modal'
 import { useI18n } from '@/i18n/provider'
 import { initSound, playCue } from '@/lib/sound'
 import { Loader2, Clipboard, Check, Flag, Film, Music, Zap } from 'lucide-react'
@@ -261,6 +262,15 @@ export default function Home() {
             stepbro downloader
           </span>
           <div className="flex items-center gap-2 text-white">
+            <SupporterWidget
+              supporter={supporter}
+              supporterKey={supporterKey}
+              donateUrl={DONATE_URL}
+              freeLimit={usage?.limit ?? 5}
+              maxDuration={supporter ? 10800 : maxDuration}
+              onApply={applySupporterKey}
+              onRemove={() => applySupporterKey(null)}
+            />
             <DonateButton href={DONATE_URL} label={m.nav.donate} />
             <LanguageSelector />
             <ThemeToggle className="text-white hover:bg-white/20 hover:text-white" />

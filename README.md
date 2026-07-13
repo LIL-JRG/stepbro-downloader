@@ -192,11 +192,19 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `YTDLP_AUTO_UPDATE` | `true` | Update yt-dlp + bgutil plugin on container start |
 | `ADMIN_TOKEN` | *(disabled)* | Enables the `/admin` page (DMCA review + supporter keys); sent as `Authorization: Bearer <token>`. Reports only block a video once approved here |
 
+| `KOFI_VERIFICATION_TOKEN` | *(disabled)* | Enables the Ko-fi payment webhook at `/api/kofi` (set it to the token shown at ko-fi.com/manage/webhooks) |
+
 > **Supporter keys:** from `/admin` you can generate keys (`SB-XXXX-XXXX-XXXX`) for
-> supporters. Entering a key on the home page ("Have a supporter key?") unlocks
-> unlimited downloads and lifts the duration cap. Keys are validated server-side on
-> every request and can be revoked/restored anytime; they persist in
-> `DATA_DIR/supporters.json`.
+> supporters. Entering a key on the home page (navbar → Supporter, or "Have a
+> supporter key?") unlocks unlimited downloads and lifts the duration cap. Keys are
+> validated server-side on every request and can be revoked/restored anytime; they
+> persist in `DATA_DIR/supporters.json`.
+>
+> **Automatic activation via Ko-fi:** set `KOFI_VERIFICATION_TOKEN` and point a
+> webhook at `https://your-domain/api/kofi` from ko-fi.com/manage/webhooks. When
+> someone pays, a key is granted to their payment email automatically — they then
+> click Supporter → enter that email, and their license activates on the spot (it
+> also works as key recovery).
 | `YOUTUBE_COOKIES_FILE` | *(disabled)* | Path to a Netscape-format YouTube cookies file (optional) |
 
 > **Local development on a residential IP** needs none of these — yt-dlp's default web
