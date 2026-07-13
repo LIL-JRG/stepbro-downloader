@@ -19,12 +19,17 @@ export async function POST(request: NextRequest) {
     note?: string
     code?: string
     plan?: string
+    count?: number
+    startOnUse?: boolean
   }
 
   if (body.action === 'create') {
     const plan: Plan = PLANS.includes(body.plan as Plan) ? (body.plan as Plan) : 'lifetime'
-    const key = createKey(typeof body.note === 'string' ? body.note.trim() : '', plan)
-    return Response.json({ key })
+    const note = typeof body.note === 'string' ? body.note.trim() : ''
+    const count = Math.min(50, Math.max(1, Math.floor(Number(body.count ?? 1)) || 1))
+    const startOnUse = body.startOnUse !== false
+    const created = Array.from({ length: count }, () => createKey(note, plan, startOnUse))
+    return Response.json({ keys: created, key: created[0] })
   }
   if ((body.action === 'revoke' || body.action === 'restore') && typeof body.code === 'string') {
     const ok = setKeyRevoked(body.code, body.action === 'revoke')

@@ -198,10 +198,13 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `EMAIL_LOOKUP_PER_HOUR` | `5` | Max license activations/recoveries by payment email per IP per hour (anti-guessing) |
 
 > **Supporter keys:** from `/admin` you can generate keys (`SB-XXXX-XXXX-XXXX`) for
-> supporters. Entering a key on the home page (navbar → Supporter, or "Have a
-> supporter key?") unlocks unlimited downloads and lifts the duration cap. Keys are
-> validated server-side on every request and can be revoked/restored anytime; they
-> persist in `DATA_DIR/supporters.json`.
+> supporters — individually or in batches (up to 50), with a plan (7/30/90-day or
+> lifetime). With "Start on first use" (the default), a timed key sits UNUSED and
+> its countdown only begins when it's first activated, so pre-generated stock never
+> burns days on the shelf. Entering a key on the home page (navbar → Supporter, or
+> "Have a supporter key?") unlocks unlimited downloads and lifts the duration cap.
+> Keys are validated server-side on every request and can be revoked/restored
+> anytime; they persist in `DATA_DIR/supporters.json`.
 >
 > **Automatic activation via Ko-fi:** set `KOFI_VERIFICATION_TOKEN` and point a
 > webhook at `https://your-domain/api/kofi` from ko-fi.com/manage/webhooks. When

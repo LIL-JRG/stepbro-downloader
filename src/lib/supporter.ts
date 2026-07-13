@@ -27,8 +27,12 @@ export interface SupporterKey {
   email?: string
   /** Missing on keys created before plans existed — treated as lifetime. */
   plan?: Plan
-  /** Epoch ms; null/undefined = never expires. */
+  /** Epoch ms; null/undefined = never expires (lifetime, or not yet activated). */
   expiresAt?: number | null
+  /** Timed key whose countdown starts on first use instead of at creation. */
+  pendingActivation?: boolean
+  /** When the countdown actually started (first use). */
+  activatedAt?: number | null
 }
 
 const DATA_DIR = process.env.DATA_DIR || join(tmpdir(), 'stepbro')
@@ -73,16 +77,20 @@ function expiryFor(plan: Plan, from = Date.now()): number | null {
   return plan === 'lifetime' ? null : from + PLAN_DAYS[plan] * 86_400_000
 }
 
-export function createKey(note: string, plan: Plan = 'lifetime'): SupporterKey {
+export function createKey(note: string, plan: Plan = 'lifetime', startOnUse = false): SupporterKey {
   let code = generateCode()
   while (keys.some((k) => k.code === code)) code = generateCode()
+  const pending = startOnUse && plan !== 'lifetime'
   const key: SupporterKey = {
     code,
     note: note.slice(0, 200),
     ts: Date.now(),
     revoked: false,
     plan,
-    expiresAt: expiryFor(plan),
+    // Pending keys hold their countdown until first use.
+    expiresAt: pending ? null : expiryFor(plan),
+    pendingActivation: pending,
+    activatedAt: pending ? null : Date.now(),
   }
   keys.push(key)
   persist()
@@ -105,11 +113,22 @@ export function isValidKey(code: string | null | undefined): boolean {
   return !!getKeyInfo(code)
 }
 
-/** The key record when the code is valid (active + not expired), else null. */
+/**
+ * The key record when the code is valid (active + not expired), else null.
+ * First use of a pending key activates it — the plan countdown starts here.
+ */
 export function getKeyInfo(code: string | null | undefined): SupporterKey | null {
   if (!code) return null
   const key = keys.find((k) => k.code === normalize(code))
-  return key && isActive(key) ? key : null
+  if (!key || key.revoked) return null
+  if (key.pendingActivation) {
+    key.pendingActivation = false
+    key.activatedAt = Date.now()
+    key.expiresAt = expiryFor(key.plan ?? 'lifetime')
+    persist()
+    return key
+  }
+  return isActive(key) ? key : null
 }
 
 /** Active key for a payment email (used for activation and key recovery). */
@@ -119,10 +138,14 @@ export function findKeyByEmail(email: string): SupporterKey | null {
   return keys.find((k) => isActive(k) && k.email?.toLowerCase() === needle) ?? null
 }
 
+const PLAN_RANK: Record<Plan, number> = { '7d': 1, '30d': 2, '90d': 3, lifetime: 4 }
+
 /**
- * Grant a plan to a payment email (Ko-fi webhook). Idempotent and
- * renewal-friendly: an existing active key is upgraded (lifetime wins) or
- * extended (timed plans stack on top of the current expiry).
+ * Grant a plan to a payment email (Ko-fi webhook). New timed licenses are
+ * granted pending — the countdown starts when the buyer first activates, not at
+ * payment. Idempotent and renewal-friendly: an existing key is upgraded
+ * (lifetime wins; a pending key keeps the highest-ranked plan) or extended
+ * (running timed plans stack on top of the current expiry).
  */
 export function grantKeyForEmail(email: string, note: string, plan: Plan = 'lifetime'): SupporterKey {
   const existing = findKeyByEmail(email)
@@ -130,6 +153,9 @@ export function grantKeyForEmail(email: string, note: string, plan: Plan = 'life
     if (plan === 'lifetime') {
       existing.plan = 'lifetime'
       existing.expiresAt = null
+      existing.pendingActivation = false
+    } else if (existing.pendingActivation) {
+      if (PLAN_RANK[plan] > PLAN_RANK[existing.plan ?? '7d']) existing.plan = plan
     } else if (existing.expiresAt != null) {
       existing.plan = plan
       existing.expiresAt = expiryFor(plan, Math.max(Date.now(), existing.expiresAt))
@@ -138,7 +164,7 @@ export function grantKeyForEmail(email: string, note: string, plan: Plan = 'life
     persist()
     return existing
   }
-  const key = createKey(note, plan)
+  const key = createKey(note, plan, true)
   key.email = email.trim().toLowerCase()
   persist()
   return key

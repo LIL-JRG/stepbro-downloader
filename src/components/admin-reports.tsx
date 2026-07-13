@@ -24,6 +24,7 @@ interface SupporterKey {
   email?: string
   plan?: string
   expiresAt?: number | null
+  pendingActivation?: boolean
 }
 
 const PLAN_OPTIONS = [
@@ -42,6 +43,8 @@ export function AdminReports() {
   const [keys, setKeys] = useState<SupporterKey[]>([])
   const [note, setNote] = useState('')
   const [plan, setPlan] = useState('lifetime')
+  const [qty, setQty] = useState(1)
+  const [startOnUse, setStartOnUse] = useState(true)
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async (tk: string) => {
@@ -89,7 +92,14 @@ export function AdminReports() {
     }
   }
 
-  async function keyAction(body: { action: string; note?: string; code?: string; plan?: string }) {
+  async function keyAction(body: {
+    action: string
+    note?: string
+    code?: string
+    plan?: string
+    count?: number
+    startOnUse?: boolean
+  }) {
     const res = await fetch('/api/admin/keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -100,9 +110,10 @@ export function AdminReports() {
       toast.error(data.error || 'Action failed')
       return
     }
-    if (body.action === 'create' && data.key?.code) {
+    if (body.action === 'create') {
       setNote('')
-      toast.success(`Key created: ${data.key.code}`)
+      const created: { code: string }[] = data.keys ?? []
+      toast.success(created.length === 1 ? `Key created: ${created[0]?.code}` : `${created.length} keys created`)
     }
     load(token)
   }
@@ -215,9 +226,9 @@ export function AdminReports() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            keyAction({ action: 'create', note, plan })
+            keyAction({ action: 'create', note, plan, count: qty, startOnUse })
           }}
-          className="mt-3 flex flex-wrap gap-2"
+          className="mt-3 flex flex-wrap items-center gap-2"
         >
           <Input
             value={note}
@@ -234,6 +245,24 @@ export function AdminReports() {
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
+          <Input
+            type="number"
+            min={1}
+            max={50}
+            value={qty}
+            onChange={(e) => setQty(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
+            aria-label="Quantity"
+            className="h-9 w-16 rounded-xl text-center"
+          />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
+            <input
+              type="checkbox"
+              checked={startOnUse}
+              onChange={(e) => setStartOnUse(e.target.checked)}
+              className="size-3.5 accent-primary"
+            />
+            Start on first use
+          </label>
           <Button type="submit" size="sm" className="h-9 shrink-0 gap-1.5 rounded-full px-4">
             <Plus className="size-3.5" /> Generate
           </Button>
@@ -256,6 +285,9 @@ export function AdminReports() {
                   {k.email && <>{k.email} · </>}
                   {k.note && <>{k.note} · </>}
                   {new Date(k.ts).toLocaleDateString()}
+                  {k.pendingActivation && (
+                    <span className="font-medium text-amber-600 dark:text-amber-400"> · UNUSED</span>
+                  )}
                   {k.expiresAt != null &&
                     (k.expiresAt > Date.now()
                       ? ` · expires ${new Date(k.expiresAt).toLocaleDateString()}`
