@@ -170,6 +170,18 @@ them in Netscape format (e.g. with [Get cookies.txt](https://chromewebstore.goog
 > both the bot check and the SABR/GVS restriction, returning the full format list up
 > to 4K without any account cookies.
 
+#### 3. (Optional) Auth-gated sites: Instagram / X / Facebook
+
+These block datacenter IPs **and** require a login for most content. On a VPS you
+need both:
+
+1. **Proxy** — they're already in `YTDLP_PROXY`'s default allowlist, so a configured
+   `YTDLP_PROXY` (WARP or residential) covers the IP block automatically.
+2. **Cookies** — export a Netscape cookies.txt while signed in to each site (same
+   [Get cookies.txt](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) extension; one file can hold all of them), mount it, and set
+   `COOKIES_FILE=/cookies/cookies.txt`. yt-dlp sends only the cookies matching each
+   site, so the same file is safe to use everywhere.
+
 #### Debug endpoint
 
 `GET /api/debug` returns the yt-dlp version, the active proxy, bgutil connectivity
@@ -187,6 +199,7 @@ for real `mp4_dash`/`webm_dash` formats rather than only `sb0..sb3` storyboards)
 | `YTDLP_PROXY` | *(disabled)* | Outbound proxy for yt-dlp (`http://…` or `socks5://…`) to bypass a blocked VPS IP. Applied only to sites that block datacenter IPs (YouTube, Instagram, Facebook, X/Twitter) so fast CDNs aren't slowed by the proxy hop |
 | `YTDLP_PROXY_SITES` | *(built-in list)* | Extra hostnames (comma-separated) to also route through `YTDLP_PROXY`, added to the built-in list |
 | `YTDLP_PROXY_ALL` | `false` | Set `true` to route **every** site through `YTDLP_PROXY` |
+| `COOKIES_FILE` | *(disabled)* | Path to a Netscape cookies.txt with signed-in sessions for auth-gated sites (Instagram, X, Facebook, members-only videos…). One file can hold many domains; yt-dlp sends only the cookies matching each request |
 | `DAILY_DOWNLOAD_LIMIT` | `5` | Max successful downloads per client IP per day |
 | `MAX_VIDEO_DURATION` | `3600` | Max allowed video length in seconds for free users (0 = unlimited); supporters are exempt |
 | `DATA_DIR` | `/data` (Docker) | Where per-IP rate-limit state is persisted; mount a volume here to keep it across redeploys |

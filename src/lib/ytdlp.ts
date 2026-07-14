@@ -47,11 +47,18 @@ export function needsProxy(url?: string): boolean {
 export async function commonYtdlpArgs(targetUrl?: string): Promise<string[]> {
   const args: string[] = []
 
-  const cookiesFile = process.env.YOUTUBE_COOKIES_FILE
   const bgutilUrl   = process.env.BGUTIL_URL?.replace(/\/$/, '')
   const proxy       = process.env.YTDLP_PROXY
   const proxyAll    = process.env.YTDLP_PROXY_ALL === 'true'
   const youtube     = isYouTubeUrl(targetUrl)
+
+  // Cookies for auth-gated sites (Instagram, X, Facebook, members-only videos…).
+  // A single Netscape cookies.txt can hold sessions for many domains — yt-dlp
+  // sends only the cookies matching each request's domain — so COOKIES_FILE
+  // applies to every site. YOUTUBE_COOKIES_FILE stays as a YouTube-specific
+  // override (takes precedence on YouTube URLs) for backward compatibility.
+  const cookiesFile =
+    (youtube && process.env.YOUTUBE_COOKIES_FILE) || process.env.COOKIES_FILE
 
   // Route outbound yt-dlp traffic through a forward proxy for sites that block a
   // flagged datacenter IP (YouTube's "Sign in to confirm you're not a bot",
@@ -60,6 +67,9 @@ export async function commonYtdlpArgs(targetUrl?: string): Promise<string[]> {
   // doesn't cap their speed. Accepts any yt-dlp --proxy URL, e.g.
   // http://user:pass@host:port or socks5://host:port.
   if (proxy && (proxyAll || needsProxy(targetUrl))) args.push('--proxy', proxy)
+
+  // Applied to every site (yt-dlp matches cookies to the domain itself).
+  if (cookiesFile) args.push('--cookies', cookiesFile)
 
   if (youtube) {
     // Resolve the JS runtime to the Node binary actually running this process.
@@ -79,12 +89,6 @@ export async function commonYtdlpArgs(targetUrl?: string): Promise<string[]> {
     // provider's base_url.
     if (bgutilUrl) {
       args.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${bgutilUrl}`)
-    }
-
-    // Cookies are optional and additive: a signed-in session gives yt-dlp the
-    // account context (and binds tokens to the account session id).
-    if (cookiesFile) {
-      args.push('--cookies', cookiesFile)
     }
   }
 
