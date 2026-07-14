@@ -4,17 +4,45 @@ export function isYouTubeUrl(url?: string): boolean {
   return /(?:youtube\.com|youtu\.be|youtube-nocookie\.com)/i.test(url)
 }
 
+// Sites known to block or rate-limit datacenter IPs, so they need the outbound
+// proxy. Everything else (TikTok, Vimeo, Reddit, Twitch…) stays direct so the
+// proxy hop doesn't throttle a fast CDN. Operators can add more hostnames via
+// YTDLP_PROXY_SITES (comma-separated), or set YTDLP_PROXY_ALL=true for all.
+const DEFAULT_PROXY_SITES = [
+  'youtube.com',
+  'youtu.be',
+  'youtube-nocookie.com',
+  'instagram.com',
+  'facebook.com',
+  'fb.watch',
+  'fb.com',
+  'twitter.com',
+  'x.com',
+  't.co',
+]
+
+/** Whether this target should be routed through YTDLP_PROXY. */
+export function needsProxy(url?: string): boolean {
+  if (!url) return true // unknown target — be safe and proxy
+  const extra = (process.env.YTDLP_PROXY_SITES || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+  const sites = [...DEFAULT_PROXY_SITES, ...extra]
+  const u = url.toLowerCase()
+  return sites.some((s) => u.includes(s))
+}
+
 /**
  * Common yt-dlp arguments applied to every invocation.
  * Centralised here so info and download routes stay in sync.
  *
- * The proxy, PO-token provider, remote JS components and cookies all exist ONLY
- * to defeat YouTube's datacenter-IP block and SABR/GVS restriction. Applying
- * them to other sites (TikTok, X, Instagram…) is pure overhead: the proxy hop
- * (a slow WARP/residential IP) throttles a fast CDN to a crawl, and the remote
- * component fetch adds a GitHub round-trip. So we gate them on the target being
- * YouTube. Pass the target URL; omit it (or set YTDLP_PROXY_ALL=true) to force
- * the full YouTube treatment.
+ * The PO-token provider, remote JS components and cookies exist ONLY for
+ * YouTube's SABR/GVS restriction, so they stay YouTube-only. The proxy is for
+ * sites that block datacenter IPs — YouTube plus Instagram/Facebook/X — but NOT
+ * fast CDNs like TikTok/Vimeo, where the proxy hop only caps download speed. So
+ * the proxy is gated on a site allowlist (see needsProxy), the rest on YouTube.
+ * Pass the target URL; omit it (or set YTDLP_PROXY_ALL=true) for the full treatment.
  */
 export async function commonYtdlpArgs(targetUrl?: string): Promise<string[]> {
   const args: string[] = []
@@ -25,13 +53,13 @@ export async function commonYtdlpArgs(targetUrl?: string): Promise<string[]> {
   const proxyAll    = process.env.YTDLP_PROXY_ALL === 'true'
   const youtube     = isYouTubeUrl(targetUrl)
 
-  // Route outbound yt-dlp traffic through a forward proxy. On a heavily flagged
-  // datacenter IP, YouTube returns "Sign in to confirm you're not a bot"; a
-  // residential/mobile proxy (or Cloudflare WARP) gets past that. Only YouTube
-  // needs it, so skip it elsewhere (WARP would just cap the download speed)
-  // unless the operator opts into proxying everything. Accepts any yt-dlp
-  // --proxy URL, e.g. http://user:pass@host:port or socks5://host:port.
-  if (proxy && (proxyAll || youtube)) args.push('--proxy', proxy)
+  // Route outbound yt-dlp traffic through a forward proxy for sites that block a
+  // flagged datacenter IP (YouTube's "Sign in to confirm you're not a bot",
+  // Instagram/Facebook/X "login required" / rate limits). A residential/mobile
+  // proxy (or Cloudflare WARP) gets past that. Fast CDNs stay direct so the proxy
+  // doesn't cap their speed. Accepts any yt-dlp --proxy URL, e.g.
+  // http://user:pass@host:port or socks5://host:port.
+  if (proxy && (proxyAll || needsProxy(targetUrl))) args.push('--proxy', proxy)
 
   if (youtube) {
     // Resolve the JS runtime to the Node binary actually running this process.
